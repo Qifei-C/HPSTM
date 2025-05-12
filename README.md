@@ -10,7 +10,7 @@ The core goal is to refine noisy 3D pose data (e.g., from 2D-to-3D pose estimato
 
 This repository, **Human Pose Smoothing with Transformer and Manifold Constraints**, constitutes the core implementation of the **Smoothing (S)** stage within our **Genuine-ESFP (Estimating, Smoothing, Filtering, and Pose-Mapping)** pipeline.
 
-The Genuine-ESFP project ([https://github.com/Qifei-C/Genuine-ESFP](https://github.com/Qifei-C/Genuine-ESFP)) is designed for real-time monocular 3D human pose extraction and robotic imitation, specifically targeting the SwiftPro desktop arm. The ESFP pipeline modularizes this complex task into four key stages:
+The Genuine-ESFP project ([https://github.com/Qifei-C/Genuine-ESFP](https://github.com/Qifei-C/Genuine-ESFP)) is designed for real-time monocular 3D human pose extraction and robotic imitation. The ESFP pipeline modularizes this complex task into four key stages:
 
 1.  **E**stimate: Initial 3D joint estimation from monocular video.
 2.  **S**mooth: Temporal denoising and ensuring kinematic plausibility (e.g., consistent bone lengths). **This is where the model from this repository is applied.**
@@ -20,6 +20,9 @@ The Genuine-ESFP project ([https://github.com/Qifei-C/Genuine-ESFP](https://gith
 The pose smoothing model detailed herein is our advanced and enhanced solution for the "S" stage. Inspired by general-purpose smoothing techniques and the need for high physical plausibility in robotic imitation, this model employs:
 * A **Transformer-based temporal encoder** to effectively capture long-range dependencies in human motion, leading to superior temporal smoothness compared to simpler filters.
 * **Explicit manifold constraints**, achieved by representing poses as joint rotations with fixed bone lengths and utilizing a differentiable Forward Kinematics (FK) decoder. This rigorously enforces that all refined poses are anatomically sound and reside on the learned manifold of valid human poses.
+
+  ![example_combo_noise](https://github.com/user-attachments/assets/4f92e8d5-a657-43cd-bdfa-7f919219c1b8)
+
 
 By integrating this sophisticated smoothing module, the Genuine-ESFP pipeline benefits from highly accurate, temporally coherent, and kinematically valid pose sequences. These refined sequences are crucial for the robustness and quality of the subsequent Filtering (F) and Pose-Mapping (P) stages, ultimately leading to more natural and reliable robotic imitation.
 
