@@ -30,23 +30,23 @@ For a complete understanding of the entire robotic imitation system, please refe
 
 ## Key Features & Concepts
 
-* **Sliding Window Temporal Encoder:** Utilizes a Transformer encoder to process a sliding window of input frames, enabling the model to learn temporal smoothness and long-range dependencies, effectively reducing jitter while preserving motion dynamics. [cite: 1, 5, 6, 7]
-* **Manifold-Constrained Pose Representation:** Predicts joint rotations and bone lengths, defining poses on a human skeleton manifold. This ensures anatomically consistent bone lengths and joint connectivity, avoiding physically impossible poses. [cite: 2, 3, 4]
-* **Differentiable Forward Kinematics (FK) Decoder:** A differentiable FK module reconstructs 3D joint positions from the predicted rotations and bone lengths. The human skeleton is modeled as a kinematic chain, and this process allows for end-to-end training. [cite: 3, 9, 10]
-* **Modular PyTorch Implementation:** The codebase is structured модульно, with clear separation for dataset handling, skeleton definition, FK, the main pose model, and loss functions. [cite: 5]
-* **Training Strategy:** Trained on noisy pose sequences with ground-truth targets, using losses such as per-joint position error and bone-length consistency error. [cite: 11, 12, 13]
-* **Inference Pipeline:** Applies the trained model in a sliding-window fashion to new noisy sequences to produce smoothed outputs. [cite: 15, 16]
+* **Sliding Window Temporal Encoder:** Utilizes a Transformer encoder to process a sliding window of input frames, enabling the model to learn temporal smoothness and long-range dependencies, effectively reducing jitter while preserving motion dynamics.
+* **Manifold-Constrained Pose Representation:** Predicts joint rotations and bone lengths, defining poses on a human skeleton manifold. This ensures anatomically consistent bone lengths and joint connectivity, avoiding physically impossible poses.
+* **Differentiable Forward Kinematics (FK) Decoder:** A differentiable FK module reconstructs 3D joint positions from the predicted rotations and bone lengths. The human skeleton is modeled as a kinematic chain, and this process allows for end-to-end training.
+* **Modular PyTorch Implementation:** The codebase is structured модульно, with clear separation for dataset handling, skeleton definition, FK, the main pose model, and loss functions.
+* **Training Strategy:** Trained on noisy pose sequences with ground-truth targets, using losses such as per-joint position error and bone-length consistency error.
+* **Inference Pipeline:** Applies the trained model in a sliding-window fashion to new noisy sequences to produce smoothed outputs.
 
 ## Dataset Recommendations
 
-* **AMASS (Archive of Motion Capture as Surface Shapes):** Recommended for its diversity and high-quality 3D poses. [cite: 18]
-    * **CMU Mocap Subset:** Particularly well-suited due to its wide range of movements and numerous subjects, helping the model learn a broad pose manifold. [cite: 18, 19, 20]
-* **Human3.6M:** Can be used as a validation set, though it is smaller in scope compared to the CMU subset of AMASS. [cite: 21, 22]
+* **AMASS (Archive of Motion Capture as Surface Shapes):** Recommended for its diversity and high-quality 3D poses.
+    * **CMU Mocap Subset:** Particularly well-suited due to its wide range of movements and numerous subjects, helping the model learn a broad pose manifold.
+* **Human3.6M:** Can be used as a validation set, though it is smaller in scope compared to the CMU subset of AMASS.
 * **Data Preparation:**
-    * Extract 3D joint coordinates. [cite: 23]
-    * Ensure a common joint indexing and skeleton definition. [cite: 24]
-    * Compute the skeleton's rest pose and bone connectivity for FK. [cite: 25]
-    * Prepare noisy inputs by using outputs from 2D-to-3D estimators or by adding synthetic noise to ground-truth sequences. [cite: 26]
+    * Extract 3D joint coordinates.
+    * Ensure a common joint indexing and skeleton definition.
+    * Compute the skeleton's rest pose and bone connectivity for FK.
+    * Prepare noisy inputs by using outputs from 2D-to-3D estimators or by adding synthetic noise to ground-truth sequences.
 
 ## Installation
 
@@ -66,32 +66,32 @@ For a complete understanding of the entire robotic imitation system, please refe
 
 ### Skeleton Definition
 
-The model requires a skeleton definition, including parent joint indices and rest pose directions for each bone. An example 17-joint skeleton is provided in the documentation, but you should adapt this to your dataset's skeleton (e.g., from SMPL if using AMASS). [cite: 49, 50, 51, 52, 53, 58]
+The model requires a skeleton definition, including parent joint indices and rest pose directions for each bone. An example 17-joint skeleton is provided in the documentation, but you should adapt this to your dataset's skeleton (e.g., from SMPL if using AMASS).
 
 ### Training
 
 1.  **Prepare Data:**
-    * Use the `src/datasets/preprocess_amass.py` script (or similar) to process your chosen dataset (e.g., AMASS CMU subset) into sequences of 3D joint coordinates. [cite: 154]
-    * Ensure data is split into training and validation sets. [cite: 27]
-    * Configure the `PoseDataset` in `src/datasets/pose_sequence_dataset.py` with your data paths, window size, and noise parameters (if using synthetic noise). [cite: 29, 41, 130]
+    * Use the `src/datasets/preprocess_amass.py` script (or similar) to process your chosen dataset (e.g., AMASS CMU subset) into sequences of 3D joint coordinates.
+    * Ensure data is split into training and validation sets.
+    * Configure the `PoseDataset` in `src/datasets/pose_sequence_dataset.py` with your data paths, window size, and noise parameters (if using synthetic noise).
 2.  **Configure Model & Training:**
-    * Adjust hyperparameters in the training script (e.g., `scripts/train.py`), such as `window_size`, `batch_size`, `learning_rate`, model dimensions (`d_model`, `nhead`, `num_layers`). [cite: 94, 130, 157, 158]
-    * The training script initializes the `PoseModel`, optimizer (Adam with a learning rate scheduler like `ReduceLROnPlateau` is suggested), and loss functions (position MSE loss and bone length loss). [cite: 32, 34, 117, 118, 119, 127, 130]
+    * Adjust hyperparameters in the training script (e.g., `scripts/train.py`), such as `window_size`, `batch_size`, `learning_rate`, model dimensions (`d_model`, `nhead`, `num_layers`).
+    * The training script initializes the `PoseModel`, optimizer (Adam with a learning rate scheduler like `ReduceLROnPlateau` is suggested), and loss functions (position MSE loss and bone length loss).
 3.  **Run Training:**
     ```bash
     python scripts/train.py
     ```
-    * Monitor training and validation losses. Model checkpoints are typically saved based on validation performance. [cite: 132, 133, 135, 137, 138]
+    * Monitor training and validation losses. Model checkpoints are typically saved based on validation performance.
 
 ### Inference
 
 1.  **Load Trained Model:**
     * Initialize the `PoseModel` with the same architecture used for training.
-    * Load the saved model weights (e.g., `pose_model_best.pth`). [cite: 148]
+    * Load the saved model weights (e.g., `pose_model_best.pth`).
 2.  **Prepare Input Sequence:**
-    * The input should be a NumPy array of shape `(T, J*3)` representing the noisy pose sequence (T frames, J joints with 3 coordinates each). [cite: 147]
+    * The input should be a NumPy array of shape `(T, J*3)` representing the noisy pose sequence (T frames, J joints with 3 coordinates each).
 3.  **Run Smoothing:**
-    * Use the `smooth_sequence` function provided in the inference script (e.g., `scripts/infer.py` or as outlined in the documentation [cite: 146]) which applies the model in a sliding-window manner.
+    * Use the `smooth_sequence` function provided in the inference script (e.g., `scripts/infer.py` or as outlined in the documentation) which applies the model in a sliding-window manner.
     ```python
     # Example usage within a script
     # model = PoseModel(...)
@@ -100,34 +100,34 @@ The model requires a skeleton definition, including parent joint indices and res
     # noisy_pose_sequence = ... # Load your noisy sequence
     # refined_sequence = smooth_sequence(model, noisy_pose_sequence, window_size)
     ```
-    * The output will be the refined 3D pose sequence. [cite: 148, 165]
+    * The output will be the refined 3D pose sequence.
 
 ## Implementation Details
 
 The project is implemented in PyTorch with a modular structure:
 
-* **`src/datasets/`**: Contains dataset loading (`PoseDataset` [cite: 29]) and preprocessing utilities.
-* **`src/kinematics/`**: Includes Forward Kinematics (`ForwardKinematics` [cite: 31, 61]) and skeleton definitions.
-* **`src/losses/`**: Defines loss functions like position MSE loss and bone length consistency loss. [cite: 34, 124, 125]
-* **`src/models/`**: Contains the main `PoseModel` [cite: 32, 83, 94] integrating the Transformer encoder and manifold decoder.
+* **`src/datasets/`**: Contains dataset loading (`PoseDataset`) and preprocessing utilities.
+* **`src/kinematics/`**: Includes Forward Kinematics (`ForwardKinematics`) and skeleton definitions.
+* **`src/losses/`**: Defines loss functions like position MSE loss and bone length consistency loss.
+* **`src/models/`**: Contains the main `PoseModel` integrating the Transformer encoder and manifold decoder.
 * **`scripts/`**: Provides scripts for training, inference, and data preprocessing.
 
 Key components include:
-* **`PoseDataset`**: Handles loading sequences and yielding sliding window samples. [cite: 29, 41]
-* **`ForwardKinematics`**: Converts predicted rotations and bone lengths to 3D joint positions. [cite: 31, 61, 68]
+* **`PoseDataset`**: Handles loading sequences and yielding sliding window samples.
+* **`ForwardKinematics`**: Converts predicted rotations and bone lengths to 3D joint positions.
 * **`PoseModel`**:
-    * Input projection layer. [cite: 84, 95]
-    * Learnable positional embeddings for the Transformer. [cite: 86, 96]
-    * Transformer encoder. [cite: 85]
-    * Output heads for rotations and bone lengths. [cite: 87, 88]
-    * Uses the `ForwardKinematics` module for the final pose reconstruction. [cite: 89]
+    * Input projection layer.
+    * Learnable positional embeddings for the Transformer.
+    * Transformer encoder.
+    * Output heads for rotations and bone lengths.
+    * Uses the `ForwardKinematics` module for the final pose reconstruction.
 
 ## References
 
-* [1] Zeng et al. (2022). *SmoothNet: A Plug-and-Play Network for Refining Human Poses in Videos*. [cite: 171] ([Link to paper](https://www.researchgate.net/publication/365037480_SmoothNet_A_Plug-and-Play_Network_for_Refining_Human_Poses_in_Videos)[cite: 175], [ECCV version](https://www.ecva.net/papers/eccv_2022/papers_ECCV/papers/136650615.pdf) [cite: 176])
-* [2] Rommel et al. (2024). *ManiPose: Manifold-Constrained Multi-Hypothesis 3D Human Pose Estimation*. [cite: 172] ([Link to paper](https://ar5iv.org/pdf/2312.06386) [cite: 175])
-* [3] Various authors on Differentiable Forward Kinematics for human skeletons. [cite: 173]
-* [4] AMASS Dataset: [https://amass.is.tue.mpg.de/](https://amass.is.tue.mpg.de/) [cite: 176]
-* [5] Human3.6M Dataset: [http://vision.imar.ro/human3.6m/](http://vision.imar.ro/human3.6m/) [cite: 176]
+* [1] Zeng et al. (2022). *SmoothNet: A Plug-and-Play Network for Refining Human Poses in Videos*. ([Link to paper](https://www.researchgate.net/publication/365037480_SmoothNet_A_Plug-and-Play_Network_for_Refining_Human_Poses_in_Videos), [ECCV version](https://www.ecva.net/papers/eccv_2022/papers_ECCV/papers/136650615.pdf))
+* [2] Rommel et al. (2024). *ManiPose: Manifold-Constrained Multi-Hypothesis 3D Human Pose Estimation*. ([Link to paper](https://ar5iv.org/pdf/2312.06386))
+* [3] Various authors on Differentiable Forward Kinematics for human skeletons.
+* [4] AMASS Dataset: [https://amass.is.tue.mpg.de/](https://amass.is.tue.mpg.de/)
+* [5] Human3.6M Dataset: [http://vision.imar.ro/human3.6m/](http://vision.imar.ro/human3.6m/)
 
 
