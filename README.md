@@ -108,7 +108,38 @@ The model requires a skeleton definition, including parent joint indices and res
 4. Sample Training Code:
    Under the root of project, run: 
    ```bash
-   python scripts/train.py --model_type 'transformer' --amass_root_dir "data/CMU" --val_split_ratio 0.15 --split_seed 42 --checkpoint_dir "checkpoints/cmu_auto_split_run" --log_dir "results/logs/cmu_auto_split_run" --run_name "cmu_transformer_auto_split_1" --skeleton_type 'smpl_24' --window_size 31 --batch_size 32 --learning_rate 1e-4 --num_epochs 100 --device 'cuda' --num_workers 8 --gaussian_noise_std_train 0.01 --temporal_noise_type 'filtered' --temporal_noise_scale 0.015 --temporal_filter_window 7 --outlier_prob 0.005 --outlier_scale 0.25 --bonelen_noise_scale 0.03 --d_model_transformer 512 --nhead_transformer 8 --num_encoder_layers_transformer 4 --num_decoder_layers_transformer 4 --dim_feedforward_transformer 2048 --dropout_transformer 0.15 --use_quaternions_transformer True --w_tf_loss_pose 1.0 --w_tf_loss_vel 0.75 --w_tf_loss_accel 0.5
+   python scripts/train.py \
+    --model_type transformer \
+    --amass_root_dir "data/CMU" \
+    --val_split_ratio 0.15 \
+    --split_seed 42 \
+    --checkpoint_dir "checkpoints/cmu_auto_split_run" \
+    --log_dir "results/logs/cmu_auto_split_run" \
+    --run_name "cmu_transformer_auto_split_1" \
+    --skeleton_type smpl_24 \
+    --window_size 31 \
+    --batch_size 32 \
+    --learning_rate 1e-4 \
+    --num_epochs 100 \
+    --device cuda \
+    --num_workers 8 \
+    --gaussian_noise_std_train 0.01 \
+    --temporal_noise_type filtered \
+    --temporal_noise_scale 0.015 \
+    --temporal_filter_window 7 \
+    --outlier_prob 0.005 \
+    --outlier_scale 0.25 \
+    --bonelen_noise_scale 0.03 \
+    --d_model_transformer 512 \
+    --nhead_transformer 8 \
+    --num_encoder_layers_transformer 4 \
+    --num_decoder_layers_transformer 4 \
+    --dim_feedforward_transformer 2048 \
+    --dropout_transformer 0.15 \
+    --use_quaternions_transformer True \
+    --w_tf_loss_pose 1.0 \
+    --w_tf_loss_vel 0.75 \
+    --w_tf_loss_accel 0.5
    ```
 
 ## Implementation Details
