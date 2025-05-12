@@ -1,4 +1,4 @@
-name: Python CI Checks
+name: CI
 
 on:
   push: # 在推送到主分支或开发分支时触发
