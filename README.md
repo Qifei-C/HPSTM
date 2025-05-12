@@ -10,7 +10,7 @@ The core goal is to refine noisy 3D pose data (e.g., from 2D-to-3D pose estimato
 
 This **Human Pose Smoothing with Transformer and Manifold Constraints** repository provides an advanced implementation for the **Smoothing (S)** stage within the broader **Genuine-ESFP (Estimating, Smoothing, Filtering, and Pose-Mapping)** pipeline.
 
-The Genuine-ESFP project ([https://github.com/Qifei-C/Genuine-ESFP](https://github.com/Qifei-C/Genuine-ESFP)) aims to convert a single RGB camera stream into smooth, physically-valid commands for robotic imitation, specifically targeting the SwiftPro desktop arm. The ESFP pipeline consists of four key stages:
+The Genuine-ESFP project ([https://github.com/Qifei-C/Genuine-ESFP](https://github.com/Qifei-C/Genuine-ESFP)) aims to convert a single RGB camera stream into smooth, physically-valid commands for robotic imitation. The ESFP pipeline consists of four key stages:
 
 1.  **E**stimate: Initial 3D joint estimation from monocular video.
 2.  **S**mooth: Temporal denoising and ensuring kinematic plausibility (e.g., consistent bone lengths).
