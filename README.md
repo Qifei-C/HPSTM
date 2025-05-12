@@ -4,6 +4,8 @@
 
 This repository contains a PyTorch implementation of a pose refinement model designed to take a sequence of noisy 3D human joint positions and output a denoised, temporally smooth, and physically plausible 3D pose sequence. The model leverages a Transformer-based temporal encoder to capture long-range dependencies within a sliding window of frames and employs manifold constraints by representing poses as joint rotations with fixed bone lengths. A differentiable Forward Kinematics (FK) decoder reconstructs joint positions from this latent representation, ensuring anatomically consistent outputs. This approach is inspired by the concepts presented in SmoothNet and ManiPose.
 
+  ![example_combo_noise](https://github.com/user-attachments/assets/4f92e8d5-a657-43cd-bdfa-7f919219c1b8)
+
 The core goal is to refine noisy 3D pose data (e.g., from 2D-to-3D pose estimators) by learning a low-dimensional manifold of valid human poses and applying temporal smoothing.
 
 ## Relation to the Genuine-ESFP Project
@@ -20,9 +22,6 @@ The Genuine-ESFP project ([https://github.com/Qifei-C/Genuine-ESFP](https://gith
 The pose smoothing model detailed herein is our advanced and enhanced solution for the "S" stage. Inspired by general-purpose smoothing techniques and the need for high physical plausibility in robotic imitation, this model employs:
 * A **Transformer-based temporal encoder** to effectively capture long-range dependencies in human motion, leading to superior temporal smoothness compared to simpler filters.
 * **Explicit manifold constraints**, achieved by representing poses as joint rotations with fixed bone lengths and utilizing a differentiable Forward Kinematics (FK) decoder. This rigorously enforces that all refined poses are anatomically sound and reside on the learned manifold of valid human poses.
-
-  ![example_combo_noise](https://github.com/user-attachments/assets/4f92e8d5-a657-43cd-bdfa-7f919219c1b8)
-
 
 By integrating this sophisticated smoothing module, the Genuine-ESFP pipeline benefits from highly accurate, temporally coherent, and kinematically valid pose sequences. These refined sequences are crucial for the robustness and quality of the subsequent Filtering (F) and Pose-Mapping (P) stages, ultimately leading to more natural and reliable robotic imitation.
 
