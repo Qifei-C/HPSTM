@@ -8,23 +8,22 @@ The core goal is to refine noisy 3D pose data (e.g., from 2D-to-3D pose estimato
 
 ## Relation to the Genuine-ESFP Project
 
-This **Human Pose Smoothing with Transformer and Manifold Constraints** repository provides an advanced implementation for the **Smoothing (S)** stage within the broader **Genuine-ESFP (Estimating, Smoothing, Filtering, and Pose-Mapping)** pipeline.
+This repository, **Human Pose Smoothing with Transformer and Manifold Constraints**, constitutes the core implementation of the **Smoothing (S)** stage within our **Genuine-ESFP (Estimating, Smoothing, Filtering, and Pose-Mapping)** pipeline.
 
-The Genuine-ESFP project ([https://github.com/Qifei-C/Genuine-ESFP](https://github.com/Qifei-C/Genuine-ESFP)) aims to convert a single RGB camera stream into smooth, physically-valid commands for robotic imitation. The ESFP pipeline consists of four key stages:
+The Genuine-ESFP project ([https://github.com/Qifei-C/Genuine-ESFP](https://github.com/Qifei-C/Genuine-ESFP)) is designed for real-time monocular 3D human pose extraction and robotic imitation, specifically targeting the SwiftPro desktop arm. The ESFP pipeline modularizes this complex task into four key stages:
 
 1.  **E**stimate: Initial 3D joint estimation from monocular video.
-2.  **S**mooth: Temporal denoising and ensuring kinematic plausibility (e.g., consistent bone lengths).
-3.  **F**ilter: State estimation and velocity calculation.
-4.  **P**ose-Map: Mapping human pose to robot degrees of freedom.
+2.  **S**mooth: Temporal denoising and ensuring kinematic plausibility (e.g., consistent bone lengths). **This is where the model from this repository is applied.**
+3.  **F**ilter: State estimation and velocity calculation for stable control.
+4.  **P**ose-Map: Mapping the refined human pose to robot degrees of freedom.
 
-While the default smoothing component in Genuine-ESFP might utilize a lighter-weight approach (like SmoothNet-light), this repository explores a more sophisticated solution for the **Smoothing** stage. It leverages:
-* A **Transformer-based temporal encoder** to capture long-range dependencies and achieve robust temporal smoothness.
-* **Manifold constraints**, by representing poses as joint rotations with fixed bone lengths and using a differentiable Forward Kinematics (FK) decoder, to ensure the refined poses are anatomically and physically plausible.
+The pose smoothing model detailed herein is our advanced and enhanced solution for the "S" stage. Inspired by general-purpose smoothing techniques and the need for high physical plausibility in robotic imitation, this model employs:
+* A **Transformer-based temporal encoder** to effectively capture long-range dependencies in human motion, leading to superior temporal smoothness compared to simpler filters.
+* **Explicit manifold constraints**, achieved by representing poses as joint rotations with fixed bone lengths and utilizing a differentiable Forward Kinematics (FK) decoder. This rigorously enforces that all refined poses are anatomically sound and reside on the learned manifold of valid human poses.
 
-Essentially, the model in this repository can be seen as a powerful alternative or enhancement for the "S" module in the ESFP pipeline, focusing on achieving high-fidelity pose refinement by rigorously enforcing learned human pose manifold properties. The outputs from this model are designed to be temporally coherent and kinematically valid sequences, suitable for downstream tasks like filtering and robot control within the ESFP framework.
+By integrating this sophisticated smoothing module, the Genuine-ESFP pipeline benefits from highly accurate, temporally coherent, and kinematically valid pose sequences. These refined sequences are crucial for the robustness and quality of the subsequent Filtering (F) and Pose-Mapping (P) stages, ultimately leading to more natural and reliable robotic imitation.
 
 For a complete understanding of the entire robotic imitation system, please refer to the main **[Genuine-ESFP repository](https://github.com/Qifei-C/Genuine-ESFP)**.
-
 
 ## Key Features & Concepts
 
