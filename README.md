@@ -1,6 +1,10 @@
 # Human Pose Smoothing with Transformer and Manifold Constraints
 *A PyTorch implementation for 3D human pose smoothing using a Transformer-based temporal encoder and manifold constraints (HPSTM) to ensure physically plausible poses. Inspired by SmoothNet and ManiPose.*
 
+![CI](https://github.com/Qifei-C/HPSTM/actions/workflows/ci.yml/badge.svg)
+![License](https://img.shields.io/github/license/Qifei-C/HPSTM)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue)
+
 ## Overview
 
 This repository contains a PyTorch implementation of a pose refinement model designed to take a sequence of noisy 3D human joint positions and output a denoised, temporally smooth, and physically plausible 3D pose sequence. The model leverages a Transformer-based temporal encoder to capture long-range dependencies within a sliding window of frames and employs manifold constraints by representing poses as joint rotations with fixed bone lengths. A differentiable Forward Kinematics (FK) decoder reconstructs joint positions from this latent representation, ensuring anatomically consistent outputs. This approach is inspired by the concepts presented in SmoothNet and ManiPose.
