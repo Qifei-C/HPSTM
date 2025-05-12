@@ -1,4 +1,4 @@
-# Human Pose Smoothing with Transformer and Manifold Constraints
+# Human Pose Smoothing with Transformer and Manifold Constraints (HPSTM)
 
 ## Overview
 
