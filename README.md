@@ -1,4 +1,5 @@
 # Human Pose Smoothing with Transformer and Manifold Constraints
+*A PyTorch implementation for 3D human pose smoothing using a Transformer-based temporal encoder and manifold constraints (HPSTM) to ensure physically plausible poses. Inspired by SmoothNet and ManiPose.*
 
 ## Overview
 
