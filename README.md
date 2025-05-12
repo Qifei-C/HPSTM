@@ -8,7 +8,7 @@ The core goal is to refine noisy 3D pose data (e.g., from 2D-to-3D pose estimato
 
 ## Relation to the Genuine-ESFP Project
 
-This manifold-based pose smoothing model is an integral component of the **Genuine-ESFP (Expressive Speech-driven Full-body Pose)** project. 
+This manifold-based pose smoothing model is an integral component of the **Genuine-ESFP (Estimating, Smoothing, Filtering, and Pose-mapping)** project. 
 
 The Genuine-ESFP pipeline focuses on generating expressive and coherent full-body human animations directly from speech inputs. This repository provides a vital post-processing or refinement stage within ESFP, ensuring that the generated poses are not only temporally smooth but also adhere to human kinematic constraints and physical plausibility by leveraging manifold learning.
 
