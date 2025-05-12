@@ -8,12 +8,22 @@ The core goal is to refine noisy 3D pose data (e.g., from 2D-to-3D pose estimato
 
 ## Relation to the Genuine-ESFP Project
 
-This manifold-based pose smoothing model is an integral component of the **Genuine-ESFP (Estimating, Smoothing, Filtering, and Pose-mapping)** project. 
+This **Human Pose Smoothing with Transformer and Manifold Constraints** repository provides an advanced implementation for the **Smoothing (S)** stage within the broader **Genuine-ESFP (Estimating, Smoothing, Filtering, and Pose-Mapping)** pipeline.
 
-The Genuine-ESFP pipeline focuses on generating expressive and coherent full-body human animations directly from speech inputs. This repository provides a vital post-processing or refinement stage within ESFP, ensuring that the generated poses are not only temporally smooth but also adhere to human kinematic constraints and physical plausibility by leveraging manifold learning.
+The Genuine-ESFP project ([https://github.com/Qifei-C/Genuine-ESFP](https://github.com/Qifei-C/Genuine-ESFP)) aims to convert a single RGB camera stream into smooth, physically-valid commands for robotic imitation, specifically targeting the SwiftPro desktop arm. The ESFP pipeline consists of four key stages:
 
-For more information on the complete Genuine-ESFP system and how this module fits into the larger architecture, please refer to the main project repository:
-* **Genuine-ESFP:** [https://github.com/Qifei-C/Genuine-ESFP](https://github.com/Qifei-C/Genuine-ESFP)
+1.  **E**stimate: Initial 3D joint estimation from monocular video.
+2.  **S**mooth: Temporal denoising and ensuring kinematic plausibility (e.g., consistent bone lengths).
+3.  **F**ilter: State estimation and velocity calculation.
+4.  **P**ose-Map: Mapping human pose to robot degrees of freedom.
+
+While the default smoothing component in Genuine-ESFP might utilize a lighter-weight approach (like SmoothNet-light), this repository explores a more sophisticated solution for the **Smoothing** stage. It leverages:
+* A **Transformer-based temporal encoder** to capture long-range dependencies and achieve robust temporal smoothness.
+* **Manifold constraints**, by representing poses as joint rotations with fixed bone lengths and using a differentiable Forward Kinematics (FK) decoder, to ensure the refined poses are anatomically and physically plausible.
+
+Essentially, the model in this repository can be seen as a powerful alternative or enhancement for the "S" module in the ESFP pipeline, focusing on achieving high-fidelity pose refinement by rigorously enforcing learned human pose manifold properties. The outputs from this model are designed to be temporally coherent and kinematically valid sequences, suitable for downstream tasks like filtering and robot control within the ESFP framework.
+
+For a complete understanding of the entire robotic imitation system, please refer to the main **[Genuine-ESFP repository](https://github.com/Qifei-C/Genuine-ESFP)**.
 
 
 ## Key Features & Concepts
