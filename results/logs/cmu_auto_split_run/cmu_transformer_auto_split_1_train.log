@@ -1,0 +1,149 @@
+Starting training run: cmu_transformer_auto_split_1
+Arguments: {'model_type': 'transformer', 'amass_root_dir': 'data/CMU', 'val_split_ratio': 0.15, 'split_seed': 42, 'simple_data_paths_train': None, 'simple_data_paths_val': None, 'checkpoint_dir': 'checkpoints/cmu_auto_split_run', 'log_dir': 'results/logs/cmu_auto_split_run', 'skeleton_type': 'smpl_24', 'window_size': 31, 'gaussian_noise_std_train': 0.007, 'temporal_noise_type': 'filtered', 'temporal_noise_scale': 0.015, 'temporal_filter_window': 7, 'temporal_event_prob': 0.05, 'temporal_decay': 0.8, 'outlier_prob': 0.005, 'outlier_scale': 0.25, 'bonelen_noise_scale': 0.03, 'd_model_transformer': 256, 'nhead_transformer': 8, 'num_encoder_layers_transformer': 4, 'num_decoder_layers_transformer': 4, 'dim_feedforward_transformer': 1024, 'dropout_transformer': 0.1, 'use_quaternions_transformer': True, 'd_model_simple': 96, 'nhead_simple': 8, 'num_encoder_layers_simple': 4, 'dim_feedforward_simple': 256, 'dropout_simple': 0.1, 'batch_size': 32, 'learning_rate': 0.0001, 'num_epochs': 100, 'device': 'cuda', 'num_workers': 4, 'w_tf_loss_pose': 1.0, 'w_tf_loss_vel': 0.75, 'w_tf_loss_accel': 0.5, 'w_simple_loss_pose': 1.0, 'w_simple_loss_bone': 0.1, 'run_name': 'cmu_transformer_auto_split_1'}
+Using SMPL+H to smpl_24 joint mapping: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 20, 21]
+Loading AMASS dataset for Transformer model from root: data/CMU
+Found 2083 .npz files in data/CMU and its subdirectories.
+Splitting AMASS data: 1770 training files, 313 validation files.
+Starting training run: cmu_transformer_auto_split_1
+Arguments: {'model_type': 'transformer', 'amass_root_dir': 'data/CMU', 'val_split_ratio': 0.15, 'split_seed': 42, 'simple_data_paths_train': None, 'simple_data_paths_val': None, 'checkpoint_dir': 'checkpoints/cmu_auto_split_run', 'log_dir': 'results/logs/cmu_auto_split_run', 'skeleton_type': 'smpl_24', 'window_size': 31, 'center_around_root_amass': True, 'gaussian_noise_std_train': 0.007, 'temporal_noise_type': 'filtered', 'temporal_noise_scale': 0.015, 'temporal_filter_window': 7, 'temporal_event_prob': 0.05, 'temporal_decay': 0.8, 'outlier_prob': 0.005, 'outlier_scale': 0.25, 'bonelen_noise_scale': 0.03, 'd_model_transformer': 256, 'nhead_transformer': 8, 'num_encoder_layers_transformer': 4, 'num_decoder_layers_transformer': 4, 'dim_feedforward_transformer': 1024, 'dropout_transformer': 0.1, 'use_quaternions_transformer': True, 'd_model_simple': 96, 'nhead_simple': 8, 'num_encoder_layers_simple': 4, 'dim_feedforward_simple': 256, 'dropout_simple': 0.1, 'batch_size': 32, 'learning_rate': 0.0001, 'num_epochs': 100, 'device': 'cuda', 'num_workers': 4, 'w_tf_loss_pose': 1.0, 'w_tf_loss_vel': 0.75, 'w_tf_loss_accel': 0.5, 'w_simple_loss_pose': 1.0, 'w_simple_loss_bone': 0.1, 'run_name': 'cmu_transformer_auto_split_1'}
+Using SMPL+H to smpl_24 joint mapping: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 20, 21]
+Loading AMASS dataset for Transformer model from root: data/CMU
+Found 2083 .npz files in data/CMU and its subdirectories.
+Splitting AMASS data: 1770 training files, 313 validation files.
+Starting training run: cmu_transformer_auto_split_1
+Arguments: {'model_type': 'transformer', 'amass_root_dir': 'data/CMU', 'val_split_ratio': 0.15, 'split_seed': 42, 'simple_data_paths_train': None, 'simple_data_paths_val': None, 'checkpoint_dir': 'checkpoints/cmu_auto_split_run', 'log_dir': 'results/logs/cmu_auto_split_run', 'skeleton_type': 'smpl_24', 'window_size': 31, 'center_around_root_amass': True, 'gaussian_noise_std_train': 0.007, 'temporal_noise_type': 'filtered', 'temporal_noise_scale': 0.015, 'temporal_filter_window': 7, 'temporal_event_prob': 0.05, 'temporal_decay': 0.8, 'outlier_prob': 0.005, 'outlier_scale': 0.25, 'bonelen_noise_scale': 0.03, 'd_model_transformer': 256, 'nhead_transformer': 8, 'num_encoder_layers_transformer': 4, 'num_decoder_layers_transformer': 4, 'dim_feedforward_transformer': 1024, 'dropout_transformer': 0.1, 'use_quaternions_transformer': True, 'd_model_simple': 96, 'nhead_simple': 8, 'num_encoder_layers_simple': 4, 'dim_feedforward_simple': 256, 'dropout_simple': 0.1, 'batch_size': 32, 'learning_rate': 0.0001, 'num_epochs': 100, 'device': 'cuda', 'num_workers': 4, 'w_tf_loss_pose': 1.0, 'w_tf_loss_vel': 0.75, 'w_tf_loss_accel': 0.5, 'w_simple_loss_pose': 1.0, 'w_simple_loss_bone': 0.1, 'run_name': 'cmu_transformer_auto_split_1'}
+Using SMPL+H to smpl_24 joint mapping: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 20, 21]
+Loading AMASS dataset for Transformer model from root: data/CMU
+Found 11 .npz files in data/CMU and its subdirectories.
+Splitting AMASS data: 9 training files, 2 validation files.
+Starting training run: cmu_transformer_auto_split_1
+Arguments: {'model_type': 'transformer', 'amass_root_dir': 'data/CMU', 'val_split_ratio': 0.15, 'split_seed': 42, 'simple_data_paths_train': None, 'simple_data_paths_val': None, 'checkpoint_dir': 'checkpoints/cmu_auto_split_run', 'log_dir': 'results/logs/cmu_auto_split_run', 'skeleton_type': 'smpl_24', 'window_size': 31, 'center_around_root_amass': True, 'gaussian_noise_std_train': 0.007, 'temporal_noise_type': 'filtered', 'temporal_noise_scale': 0.015, 'temporal_filter_window': 7, 'temporal_event_prob': 0.05, 'temporal_decay': 0.8, 'outlier_prob': 0.005, 'outlier_scale': 0.25, 'bonelen_noise_scale': 0.03, 'd_model_transformer': 256, 'nhead_transformer': 8, 'num_encoder_layers_transformer': 4, 'num_decoder_layers_transformer': 4, 'dim_feedforward_transformer': 1024, 'dropout_transformer': 0.1, 'use_quaternions_transformer': True, 'd_model_simple': 96, 'nhead_simple': 8, 'num_encoder_layers_simple': 4, 'dim_feedforward_simple': 256, 'dropout_simple': 0.1, 'batch_size': 32, 'learning_rate': 0.0001, 'num_epochs': 100, 'device': 'cuda', 'num_workers': 4, 'w_tf_loss_pose': 1.0, 'w_tf_loss_vel': 0.75, 'w_tf_loss_accel': 0.5, 'w_simple_loss_pose': 1.0, 'w_simple_loss_bone': 0.1, 'run_name': 'cmu_transformer_auto_split_1'}
+Using SMPL+H to smpl_24 joint mapping: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 20, 21]
+Loading AMASS dataset for Transformer model from root: data/CMU
+Found 11 .npz files in data/CMU and its subdirectories.
+Splitting AMASS data: 9 training files, 2 validation files.
+Training dataset size: 35803, Validation dataset size: 7345
+Training model: transformer on device: cuda with 24 joints.
+Number of parameters: 7,425,895
+Starting training run: cmu_transformer_auto_split_1
+Arguments: {'model_type': 'transformer', 'amass_root_dir': 'data/CMU', 'val_split_ratio': 0.15, 'split_seed': 42, 'simple_data_paths_train': None, 'simple_data_paths_val': None, 'checkpoint_dir': 'checkpoints/cmu_auto_split_run', 'log_dir': 'results/logs/cmu_auto_split_run', 'skeleton_type': 'smpl_24', 'window_size': 31, 'center_around_root_amass': True, 'gaussian_noise_std_train': 0.007, 'temporal_noise_type': 'filtered', 'temporal_noise_scale': 0.015, 'temporal_filter_window': 7, 'temporal_event_prob': 0.05, 'temporal_decay': 0.8, 'outlier_prob': 0.005, 'outlier_scale': 0.25, 'bonelen_noise_scale': 0.03, 'd_model_transformer': 256, 'nhead_transformer': 8, 'num_encoder_layers_transformer': 4, 'num_decoder_layers_transformer': 4, 'dim_feedforward_transformer': 1024, 'dropout_transformer': 0.1, 'use_quaternions_transformer': True, 'd_model_simple': 96, 'nhead_simple': 8, 'num_encoder_layers_simple': 4, 'dim_feedforward_simple': 256, 'dropout_simple': 0.1, 'batch_size': 32, 'learning_rate': 0.0001, 'num_epochs': 100, 'device': 'cuda', 'num_workers': 4, 'w_tf_loss_pose': 1.0, 'w_tf_loss_vel': 0.75, 'w_tf_loss_accel': 0.5, 'w_simple_loss_pose': 1.0, 'w_simple_loss_bone': 0.1, 'run_name': 'cmu_transformer_auto_split_1'}
+Using SMPL+H to smpl_24 joint mapping: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 20, 21]
+Loading AMASS dataset for Transformer model from root: data/CMU
+Found 1 .npz files in data/CMU and its subdirectories.
+Error: No files allocated for training after split. Check val_split_ratio or dataset size.
+Starting training run: cmu_transformer_auto_split_1
+Arguments: {'model_type': 'transformer', 'amass_root_dir': 'data/CMU', 'val_split_ratio': 0.15, 'split_seed': 42, 'simple_data_paths_train': None, 'simple_data_paths_val': None, 'checkpoint_dir': 'checkpoints/cmu_auto_split_run', 'log_dir': 'results/logs/cmu_auto_split_run', 'skeleton_type': 'smpl_24', 'window_size': 31, 'center_around_root_amass': True, 'gaussian_noise_std_train': 0.007, 'temporal_noise_type': 'filtered', 'temporal_noise_scale': 0.015, 'temporal_filter_window': 7, 'temporal_event_prob': 0.05, 'temporal_decay': 0.8, 'outlier_prob': 0.005, 'outlier_scale': 0.25, 'bonelen_noise_scale': 0.03, 'd_model_transformer': 256, 'nhead_transformer': 8, 'num_encoder_layers_transformer': 4, 'num_decoder_layers_transformer': 4, 'dim_feedforward_transformer': 1024, 'dropout_transformer': 0.1, 'use_quaternions_transformer': True, 'd_model_simple': 96, 'nhead_simple': 8, 'num_encoder_layers_simple': 4, 'dim_feedforward_simple': 256, 'dropout_simple': 0.1, 'batch_size': 32, 'learning_rate': 0.0001, 'num_epochs': 100, 'device': 'cuda', 'num_workers': 4, 'w_tf_loss_pose': 1.0, 'w_tf_loss_vel': 0.75, 'w_tf_loss_accel': 0.5, 'w_simple_loss_pose': 1.0, 'w_simple_loss_bone': 0.1, 'run_name': 'cmu_transformer_auto_split_1'}
+Using SMPL+H to smpl_24 joint mapping: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 20, 21]
+Loading AMASS dataset for Transformer model from root: data/CMU
+Found 4 .npz files in data/CMU and its subdirectories.
+Splitting AMASS data: 3 training files, 1 validation files.
+Training dataset size: 11517, Validation dataset size: 2721
+Training model: transformer on device: cuda with 24 joints.
+Number of parameters: 7,425,895
+Starting training run: cmu_transformer_auto_split_1
+Arguments: {'model_type': 'transformer', 'amass_root_dir': 'data/CMU', 'val_split_ratio': 0.15, 'split_seed': 42, 'simple_data_paths_train': None, 'simple_data_paths_val': None, 'checkpoint_dir': 'checkpoints/cmu_auto_split_run', 'log_dir': 'results/logs/cmu_auto_split_run', 'skeleton_type': 'smpl_24', 'window_size': 31, 'center_around_root_amass': True, 'gaussian_noise_std_train': 0.007, 'temporal_noise_type': 'filtered', 'temporal_noise_scale': 0.015, 'temporal_filter_window': 7, 'temporal_event_prob': 0.05, 'temporal_decay': 0.8, 'outlier_prob': 0.005, 'outlier_scale': 0.25, 'bonelen_noise_scale': 0.03, 'd_model_transformer': 256, 'nhead_transformer': 8, 'num_encoder_layers_transformer': 4, 'num_decoder_layers_transformer': 4, 'dim_feedforward_transformer': 1024, 'dropout_transformer': 0.1, 'use_quaternions_transformer': True, 'd_model_simple': 96, 'nhead_simple': 8, 'num_encoder_layers_simple': 4, 'dim_feedforward_simple': 256, 'dropout_simple': 0.1, 'batch_size': 32, 'learning_rate': 0.0001, 'num_epochs': 100, 'device': 'cuda', 'num_workers': 4, 'w_tf_loss_pose': 1.0, 'w_tf_loss_vel': 0.75, 'w_tf_loss_accel': 0.5, 'w_simple_loss_pose': 1.0, 'w_simple_loss_bone': 0.1, 'run_name': 'cmu_transformer_auto_split_1'}
+Using SMPL+H to smpl_24 joint mapping: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 20, 21]
+Loading AMASS dataset for Transformer model from root: data/CMU
+Found 4 .npz files in data/CMU and its subdirectories.
+Splitting AMASS data: 3 training files, 1 validation files.
+Training dataset size: 11517, Validation dataset size: 2721
+Training model: transformer on device: cuda with 24 joints.
+Number of parameters: 7,425,895
+Starting training run: cmu_transformer_auto_split_1
+Arguments: {'model_type': 'transformer', 'amass_root_dir': 'data/CMU', 'val_split_ratio': 0.15, 'split_seed': 42, 'simple_data_paths_train': None, 'simple_data_paths_val': None, 'checkpoint_dir': 'checkpoints/cmu_auto_split_run', 'log_dir': 'results/logs/cmu_auto_split_run', 'skeleton_type': 'smpl_24', 'window_size': 31, 'center_around_root_amass': True, 'gaussian_noise_std_train': 0.007, 'temporal_noise_type': 'filtered', 'temporal_noise_scale': 0.015, 'temporal_filter_window': 7, 'temporal_event_prob': 0.05, 'temporal_decay': 0.8, 'outlier_prob': 0.005, 'outlier_scale': 0.25, 'bonelen_noise_scale': 0.03, 'd_model_transformer': 256, 'nhead_transformer': 8, 'num_encoder_layers_transformer': 4, 'num_decoder_layers_transformer': 4, 'dim_feedforward_transformer': 1024, 'dropout_transformer': 0.1, 'use_quaternions_transformer': True, 'd_model_simple': 96, 'nhead_simple': 8, 'num_encoder_layers_simple': 4, 'dim_feedforward_simple': 256, 'dropout_simple': 0.1, 'batch_size': 32, 'learning_rate': 0.0001, 'num_epochs': 100, 'device': 'cuda', 'num_workers': 4, 'w_tf_loss_pose': 1.0, 'w_tf_loss_vel': 0.75, 'w_tf_loss_accel': 0.5, 'w_simple_loss_pose': 1.0, 'w_simple_loss_bone': 0.1, 'run_name': 'cmu_transformer_auto_split_1'}
+Using SMPL+H to smpl_24 joint mapping: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 20, 21]
+Loading AMASS dataset for Transformer model from root: data/CMU
+Found 4 .npz files in data/CMU and its subdirectories.
+Splitting AMASS data: 3 training files, 1 validation files.
+Training dataset size: 11517, Validation dataset size: 2721
+Training model: transformer on device: cuda with 24 joints.
+Number of parameters: 7,425,895
+Starting training run: cmu_transformer_auto_split_1
+Arguments: {'model_type': 'transformer', 'amass_root_dir': 'data/CMU', 'val_split_ratio': 0.15, 'split_seed': 42, 'simple_data_paths_train': None, 'simple_data_paths_val': None, 'checkpoint_dir': 'checkpoints/cmu_auto_split_run', 'log_dir': 'results/logs/cmu_auto_split_run', 'skeleton_type': 'smpl_24', 'window_size': 31, 'center_around_root_amass': True, 'gaussian_noise_std_train': 0.007, 'temporal_noise_type': 'filtered', 'temporal_noise_scale': 0.015, 'temporal_filter_window': 7, 'temporal_event_prob': 0.05, 'temporal_decay': 0.8, 'outlier_prob': 0.005, 'outlier_scale': 0.25, 'bonelen_noise_scale': 0.03, 'd_model_transformer': 256, 'nhead_transformer': 8, 'num_encoder_layers_transformer': 4, 'num_decoder_layers_transformer': 4, 'dim_feedforward_transformer': 1024, 'dropout_transformer': 0.1, 'use_quaternions_transformer': True, 'd_model_simple': 96, 'nhead_simple': 8, 'num_encoder_layers_simple': 4, 'dim_feedforward_simple': 256, 'dropout_simple': 0.1, 'batch_size': 32, 'learning_rate': 0.0001, 'num_epochs': 100, 'device': 'cuda', 'num_workers': 4, 'w_tf_loss_pose': 1.0, 'w_tf_loss_vel': 0.75, 'w_tf_loss_accel': 0.5, 'w_tf_loss_bone': 0.1, 'w_simple_loss_pose': 1.0, 'w_simple_loss_bone': 0.1, 'run_name': 'cmu_transformer_auto_split_1'}
+Using SMPL+H to smpl_24 joint mapping: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 20, 21]
+Loading AMASS dataset for Transformer model from root: data/CMU
+Found 4 .npz files in data/CMU and its subdirectories.
+Splitting AMASS data: 3 training files, 1 validation files.
+Training dataset size: 11517, Validation dataset size: 2721
+Starting training run: cmu_transformer_auto_split_1
+Arguments: {'model_type': 'transformer', 'amass_root_dir': 'data/CMU', 'val_split_ratio': 0.15, 'split_seed': 42, 'simple_data_paths_train': None, 'simple_data_paths_val': None, 'checkpoint_dir': 'checkpoints/cmu_auto_split_run', 'log_dir': 'results/logs/cmu_auto_split_run', 'skeleton_type': 'smpl_24', 'window_size': 31, 'center_around_root_amass': True, 'gaussian_noise_std_train': 0.007, 'temporal_noise_type': 'filtered', 'temporal_noise_scale': 0.015, 'temporal_filter_window': 7, 'temporal_event_prob': 0.05, 'temporal_decay': 0.8, 'outlier_prob': 0.005, 'outlier_scale': 0.25, 'bonelen_noise_scale': 0.03, 'd_model_transformer': 256, 'nhead_transformer': 8, 'num_encoder_layers_transformer': 4, 'num_decoder_layers_transformer': 4, 'dim_feedforward_transformer': 1024, 'dropout_transformer': 0.1, 'use_quaternions_transformer': True, 'd_model_simple': 96, 'nhead_simple': 8, 'num_encoder_layers_simple': 4, 'dim_feedforward_simple': 256, 'dropout_simple': 0.1, 'batch_size': 32, 'learning_rate': 0.0001, 'num_epochs': 100, 'device': 'cuda', 'num_workers': 4, 'w_tf_loss_pose': 1.0, 'w_tf_loss_vel': 0.75, 'w_tf_loss_accel': 0.5, 'w_tf_loss_bone': 0.1, 'w_simple_loss_pose': 1.0, 'w_simple_loss_bone': 0.1, 'run_name': 'cmu_transformer_auto_split_1'}
+Using SMPL+H to smpl_24 joint mapping: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 20, 21]
+Loading AMASS dataset for Transformer model from root: data/CMU
+Found 4 .npz files in data/CMU and its subdirectories.
+Splitting AMASS data: 3 training files, 1 validation files.
+Training dataset size: 11517, Validation dataset size: 2721
+Training model: transformer on device: cuda with 24 joints.
+Number of parameters: 7,432,063
+Starting training run: cmu_transformer_auto_split_1
+Arguments: {'model_type': 'transformer', 'amass_root_dir': 'data/CMU', 'val_split_ratio': 0.15, 'split_seed': 42, 'simple_data_paths_train': None, 'simple_data_paths_val': None, 'checkpoint_dir': 'checkpoints/cmu_auto_split_run', 'log_dir': 'results/logs/cmu_auto_split_run', 'skeleton_type': 'smpl_24', 'window_size': 31, 'center_around_root_amass': True, 'gaussian_noise_std_train': 0.007, 'temporal_noise_type': 'filtered', 'temporal_noise_scale': 0.015, 'temporal_filter_window': 7, 'temporal_event_prob': 0.05, 'temporal_decay': 0.8, 'outlier_prob': 0.005, 'outlier_scale': 0.25, 'bonelen_noise_scale': 0.03, 'd_model_transformer': 256, 'nhead_transformer': 8, 'num_encoder_layers_transformer': 4, 'num_decoder_layers_transformer': 4, 'dim_feedforward_transformer': 1024, 'dropout_transformer': 0.1, 'use_quaternions_transformer': True, 'd_model_simple': 96, 'nhead_simple': 8, 'num_encoder_layers_simple': 4, 'dim_feedforward_simple': 256, 'dropout_simple': 0.1, 'batch_size': 32, 'learning_rate': 0.0001, 'num_epochs': 100, 'device': 'cuda', 'num_workers': 4, 'w_tf_loss_pose': 1.0, 'w_tf_loss_vel': 0.75, 'w_tf_loss_accel': 0.5, 'w_tf_loss_bone': 0.1, 'w_simple_loss_pose': 1.0, 'w_simple_loss_bone': 0.1, 'run_name': 'cmu_transformer_auto_split_1'}
+Using SMPL+H to smpl_24 joint mapping: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 20, 21]
+Loading AMASS dataset for Transformer model from root: data/CMU
+Found 4 .npz files in data/CMU and its subdirectories.
+Splitting AMASS data: 3 training files, 1 validation files.
+Training dataset size: 11517, Validation dataset size: 2721
+Training model: transformer on device: cuda with 24 joints.
+Number of parameters: 7,432,063
+Starting training run: cmu_transformer_auto_split_1
+Arguments: {'model_type': 'transformer', 'amass_root_dir': 'data/CMU', 'val_split_ratio': 0.15, 'split_seed': 42, 'simple_data_paths_train': None, 'simple_data_paths_val': None, 'checkpoint_dir': 'checkpoints/cmu_auto_split_run', 'log_dir': 'results/logs/cmu_auto_split_run', 'skeleton_type': 'smpl_24', 'window_size': 31, 'center_around_root_amass': True, 'gaussian_noise_std_train': 0.007, 'temporal_noise_type': 'filtered', 'temporal_noise_scale': 0.015, 'temporal_filter_window': 7, 'temporal_event_prob': 0.05, 'temporal_decay': 0.8, 'outlier_prob': 0.005, 'outlier_scale': 0.25, 'bonelen_noise_scale': 0.03, 'd_model_transformer': 256, 'nhead_transformer': 8, 'num_encoder_layers_transformer': 4, 'num_decoder_layers_transformer': 4, 'dim_feedforward_transformer': 1024, 'dropout_transformer': 0.1, 'use_quaternions_transformer': True, 'd_model_simple': 96, 'nhead_simple': 8, 'num_encoder_layers_simple': 4, 'dim_feedforward_simple': 256, 'dropout_simple': 0.1, 'batch_size': 32, 'learning_rate': 0.0001, 'num_epochs': 100, 'device': 'cuda', 'num_workers': 4, 'w_tf_loss_pose': 1.0, 'w_tf_loss_vel': 0.75, 'w_tf_loss_accel': 0.5, 'w_tf_loss_bone': 0.1, 'w_simple_loss_pose': 1.0, 'w_simple_loss_bone': 0.1, 'run_name': 'cmu_transformer_auto_split_1'}
+Using SMPL+H to smpl_24 joint mapping: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 20, 21]
+Loading AMASS dataset for Transformer model from root: data/CMU
+Found 4 .npz files in data/CMU and its subdirectories.
+Splitting AMASS data: 3 training files, 1 validation files.
+Training dataset size: 11517, Validation dataset size: 2721
+Training model: transformer on device: cuda with 24 joints.
+Number of parameters: 7,432,063
+Epoch 1 | Batch 0/360 | Train Loss: 0.8855 (P: 0.4984 V: 0.2324 A: 0.3939 B: 0.1589)
+Epoch 1 | Batch 50/360 | Train Loss: 0.2990 (P: 0.2050 V: 0.0578 A: 0.1012 B: 0.0003)
+Epoch 1 | Batch 100/360 | Train Loss: 0.2573 (P: 0.2081 V: 0.0305 A: 0.0527 B: 0.0001)
+Epoch 1 | Batch 150/360 | Train Loss: 0.2344 (P: 0.1971 V: 0.0230 A: 0.0400 B: 0.0000)
+Epoch 1 | Batch 200/360 | Train Loss: 0.2309 (P: 0.2004 V: 0.0189 A: 0.0327 B: 0.0000)
+Epoch 1 | Batch 250/360 | Train Loss: 0.2259 (P: 0.1988 V: 0.0167 A: 0.0290 B: 0.0000)
+Starting training run: cmu_transformer_auto_split_1
+Arguments: {'model_type': 'transformer', 'amass_root_dir': 'data/CMU', 'val_split_ratio': 0.15, 'split_seed': 42, 'simple_data_paths_train': None, 'simple_data_paths_val': None, 'checkpoint_dir': 'checkpoints/cmu_auto_split_run', 'log_dir': 'results/logs/cmu_auto_split_run', 'skeleton_type': 'smpl_24', 'window_size': 31, 'center_around_root_amass': True, 'gaussian_noise_std_train': 0.007, 'temporal_noise_type': 'filtered', 'temporal_noise_scale': 0.015, 'temporal_filter_window': 7, 'temporal_event_prob': 0.05, 'temporal_decay': 0.8, 'outlier_prob': 0.005, 'outlier_scale': 0.25, 'bonelen_noise_scale': 0.03, 'd_model_transformer': 256, 'nhead_transformer': 8, 'num_encoder_layers_transformer': 4, 'num_decoder_layers_transformer': 4, 'dim_feedforward_transformer': 1024, 'dropout_transformer': 0.1, 'use_quaternions_transformer': True, 'd_model_simple': 96, 'nhead_simple': 8, 'num_encoder_layers_simple': 4, 'dim_feedforward_simple': 256, 'dropout_simple': 0.1, 'batch_size': 32, 'learning_rate': 0.0001, 'num_epochs': 100, 'device': 'cuda', 'num_workers': 4, 'w_tf_loss_pose': 1.0, 'w_tf_loss_vel': 0.75, 'w_tf_loss_accel': 0.5, 'w_tf_loss_bone': 0.1, 'w_simple_loss_pose': 1.0, 'w_simple_loss_bone': 0.1, 'run_name': 'cmu_transformer_auto_split_1'}
+Using SMPL+H to smpl_24 joint mapping: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 20, 21]
+Loading AMASS dataset for Transformer model from root: data/CMU
+Found 4 .npz files in data/CMU and its subdirectories.
+Splitting AMASS data: 3 training files, 1 validation files.
+Training dataset size: 11517, Validation dataset size: 2721
+Training model: transformer on device: cuda with 24 joints.
+Number of parameters: 7,432,063
+Epoch 1 | Batch 0/360 | Train Loss: 1.0481 (P: 0.5971 V: 0.2706 A: 0.4641 B: 0.1609)
+Epoch 1 | Batch 50/360 | Train Loss: 0.3095 (P: 0.2056 V: 0.0644 A: 0.1112 B: 0.0000)
+Epoch 1 | Batch 100/360 | Train Loss: 0.2586 (P: 0.2023 V: 0.0348 A: 0.0604 B: 0.0000)
+Epoch 1 | Batch 150/360 | Train Loss: 0.2489 (P: 0.2073 V: 0.0257 A: 0.0446 B: 0.0000)
+Epoch 1 | Batch 200/360 | Train Loss: 0.2332 (P: 0.1985 V: 0.0215 A: 0.0372 B: 0.0000)
+Epoch 1 | Batch 250/360 | Train Loss: 0.2280 (P: 0.1978 V: 0.0187 A: 0.0324 B: 0.0000)
+Epoch 1 | Batch 300/360 | Train Loss: 0.2271 (P: 0.1988 V: 0.0175 A: 0.0304 B: 0.0000)
+Epoch 1 | Batch 350/360 | Train Loss: 0.2251 (P: 0.1995 V: 0.0160 A: 0.0272 B: 0.0000)
+Epoch 1/100 | Avg Train Loss: 0.2699 (P: 0.2107 V: 0.0366 A: 0.0630 B: 0.0025)
+Epoch 1 | Val Loss: 0.1915 MPJPE: 2471.90mm (P: 0.1891 V: 0.0022 A: 0.0016 B: 0.0000)
+Best model checkpoint saved to checkpoints/cmu_auto_split_run\cmu_transformer_auto_split_1\model_epoch_001_valloss_0.1915_mpjpe_2471.90_B_0.0000.pth
+Epoch 2 | Batch 0/360 | Train Loss: 0.2223 (P: 0.1970 V: 0.0157 A: 0.0271 B: 0.0000)
+Epoch 2 | Batch 50/360 | Train Loss: 0.2185 (P: 0.1962 V: 0.0140 A: 0.0236 B: 0.0000)
+Epoch 2 | Batch 100/360 | Train Loss: 0.2248 (P: 0.2024 V: 0.0140 A: 0.0238 B: 0.0000)
+Epoch 2 | Batch 150/360 | Train Loss: 0.2164 (P: 0.1957 V: 0.0128 A: 0.0220 B: 0.0000)
+Epoch 2 | Batch 200/360 | Train Loss: 0.2193 (P: 0.1997 V: 0.0122 A: 0.0210 B: 0.0000)
+Epoch 2 | Batch 250/360 | Train Loss: 0.2173 (P: 0.1991 V: 0.0114 A: 0.0193 B: 0.0000)
+Epoch 2 | Batch 300/360 | Train Loss: 0.2170 (P: 0.1992 V: 0.0111 A: 0.0189 B: 0.0000)
+Epoch 2 | Batch 350/360 | Train Loss: 0.2126 (P: 0.1960 V: 0.0104 A: 0.0177 B: 0.0000)
+Epoch 2/100 | Avg Train Loss: 0.2185 (P: 0.1984 V: 0.0125 A: 0.0214 B: 0.0000)
+Epoch 2 | Val Loss: 0.1902 MPJPE: 2469.95mm (P: 0.1885 V: 0.0019 A: 0.0007 B: 0.0000)
+Best model checkpoint saved to checkpoints/cmu_auto_split_run\cmu_transformer_auto_split_1\model_epoch_002_valloss_0.1902_mpjpe_2469.95_B_0.0000.pth
+Epoch 3 | Batch 0/360 | Train Loss: 0.2114 (P: 0.1955 V: 0.0100 A: 0.0168 B: 0.0000)
+Epoch 3 | Batch 50/360 | Train Loss: 0.2158 (P: 0.2001 V: 0.0099 A: 0.0167 B: 0.0000)
+Epoch 3 | Batch 100/360 | Train Loss: 0.2128 (P: 0.1978 V: 0.0094 A: 0.0159 B: 0.0000)
+Epoch 3 | Batch 150/360 | Train Loss: 0.2150 (P: 0.2002 V: 0.0093 A: 0.0156 B: 0.0000)
+Epoch 3 | Batch 200/360 | Train Loss: 0.2102 (P: 0.1965 V: 0.0087 A: 0.0144 B: 0.0000)
+Epoch 3 | Batch 250/360 | Train Loss: 0.2088 (P: 0.1951 V: 0.0086 A: 0.0145 B: 0.0000)
+Epoch 3 | Batch 300/360 | Train Loss: 0.2204 (P: 0.2068 V: 0.0086 A: 0.0143 B: 0.0000)
+Epoch 3 | Batch 350/360 | Train Loss: 0.2066 (P: 0.1936 V: 0.0081 A: 0.0137 B: 0.0000)
+Epoch 3/100 | Avg Train Loss: 0.2121 (P: 0.1978 V: 0.0090 A: 0.0151 B: 0.0000)
+Epoch 3 | Val Loss: 0.1898 MPJPE: 2487.03mm (P: 0.1881 V: 0.0019 A: 0.0006 B: 0.0000)
+Best model checkpoint saved to checkpoints/cmu_auto_split_run\cmu_transformer_auto_split_1\model_epoch_003_valloss_0.1898_mpjpe_2487.03_B_0.0000.pth
+Epoch 4 | Batch 0/360 | Train Loss: 0.2114 (P: 0.1984 V: 0.0082 A: 0.0137 B: 0.0000)
+Epoch 4 | Batch 50/360 | Train Loss: 0.2098 (P: 0.1977 V: 0.0077 A: 0.0127 B: 0.0000)
+Epoch 4 | Batch 100/360 | Train Loss: 0.2067 (P: 0.1954 V: 0.0072 A: 0.0117 B: 0.0000)
+Epoch 4 | Batch 150/360 | Train Loss: 0.2110 (P: 0.1993 V: 0.0074 A: 0.0123 B: 0.0000)
+Epoch 4 | Batch 200/360 | Train Loss: 0.2073 (P: 0.1962 V: 0.0071 A: 0.0116 B: 0.0000)
+Epoch 4 | Batch 250/360 | Train Loss: 0.2089 (P: 0.1982 V: 0.0068 A: 0.0113 B: 0.0000)
+Epoch 4 | Batch 300/360 | Train Loss: 0.2057 (P: 0.1955 V: 0.0065 A: 0.0106 B: 0.0000)
