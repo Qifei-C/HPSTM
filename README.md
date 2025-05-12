@@ -37,11 +37,11 @@ For a complete understanding of the entire robotic imitation system, please refe
 * **Sliding Window Temporal Encoder:** Utilizes a Transformer encoder to process a sliding window of input frames, enabling the model to learn temporal smoothness and long-range dependencies, effectively reducing jitter while preserving motion dynamics.
 * **Manifold-Constrained Pose Representation:** Predicts joint rotations and bone lengths, defining poses on a human skeleton manifold. This ensures anatomically consistent bone lengths and joint connectivity, avoiding physically impossible poses.
 * **Differentiable Forward Kinematics (FK) Decoder:** A differentiable FK module reconstructs 3D joint positions from the predicted rotations and bone lengths. The human skeleton is modeled as a kinematic chain, and this process allows for end-to-end training.
-* **Modular PyTorch Implementation:** The codebase is structured модульно, with clear separation for dataset handling, skeleton definition, FK, the main pose model, and loss functions.
+* **Modular PyTorch Implementation:** The codebase is structured modular, with clear separation for dataset handling, skeleton definition, FK, the main pose model, and loss functions.
 * **Training Strategy:** Trained on noisy pose sequences with ground-truth targets, using losses such as per-joint position error and bone-length consistency error.
 * **Inference Pipeline:** Applies the trained model in a sliding-window fashion to new noisy sequences to produce smoothed outputs.
 
-## Dataset Recommendations
+## Datasets
 
 * **AMASS (Archive of Motion Capture as Surface Shapes):** Recommended for its diversity and high-quality 3D poses.
     * **CMU Mocap Subset:** Particularly well-suited due to its wide range of movements and numerous subjects, helping the model learn a broad pose manifold.
