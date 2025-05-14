@@ -99,6 +99,8 @@ def parse_args():
     parser.add_argument('--device', type=str, default="cuda" if torch.cuda.is_available() else "cpu",
                         help="Device to use for training (cuda or cpu)")
     parser.add_argument('--num_workers', type=int, default=4, help="Number of dataloader workers")
+    parser.add_argument('--resume_checkpoint', type=str, default=None,
+                        help="Path to the checkpoint file to resume training from (.pth)")
 
     # --- Loss weights ---
     parser.add_argument('--w_tf_loss_pose', type=float, default=1.0)
@@ -277,13 +279,15 @@ def main(args):
             num_joints=num_joints, # joint_dim will be 3 internally for R3J
             joint_dim=3,
             window_size=args.window_size,
-            d_model=args.d_model_transformer, nhead=args.nhead_transformer,
+            d_model=args.d_model_transformer, 
+            nhead=args.nhead_transformer,
             num_encoder_layers=args.num_encoder_layers_transformer,
             num_decoder_layers=args.num_decoder_layers_transformer,
             dim_feedforward=args.dim_feedforward_transformer,
             dropout=args.dropout_transformer,
             smpl_parents=skeleton_parents_np.tolist(),
-            use_quaternions=args.use_quaternions_transformer
+            use_quaternions=args.use_quaternions_transformer,
+            skeleton_type=args.skeleton_type
         ).to(device)
         criterion_pose = nn.L1Loss().to(device) # Or PositionMSELoss if you prefer
         criterion_vel = VelocityLoss(loss_type='l1').to(device)
@@ -296,6 +300,7 @@ def main(args):
             'dim_feedforward': args.dim_feedforward_transformer, 'dropout': args.dropout_transformer,
             'smpl_parents': skeleton_parents_np.tolist(),
             'use_quaternions': args.use_quaternions_transformer,
+            'skeleton_type': args.skeleton_type
             # 'center_around_root': args.center_around_root_amass # This is a dataset param, not model constr.
         })
 
@@ -330,8 +335,49 @@ def main(args):
     optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=5, verbose=True)
 
+    start_epoch = 1
     best_val_loss = float('inf')
-    for epoch in range(1, args.num_epochs + 1):
+    
+    if args.resume_checkpoint:
+        if os.path.isfile(args.resume_checkpoint):
+            log_message(f"Loading checkpoint: {args.resume_checkpoint}")
+            checkpoint = torch.load(args.resume_checkpoint, map_location=device)
+            
+            # 检查模型参数是否匹配 (可选但推荐)
+            current_model_dict = model.state_dict()
+            loaded_state_dict = checkpoint['model_state_dict']
+            new_state_dict = {k: v for k, v in loaded_state_dict.items() if k in current_model_dict.keys()}
+            current_model_dict.update(new_state_dict)
+            model.load_state_dict(current_model_dict)
+            log_message(f"Loaded model state_dict. {len(new_state_dict)} keys matched.")
+
+            model.load_state_dict(checkpoint['model_state_dict']) # 标准加载
+            
+            if 'optimizer_state_dict' in checkpoint:
+                optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+                log_message("Loaded optimizer state_dict.")
+            
+            if 'epoch' in checkpoint:
+                start_epoch = checkpoint['epoch'] + 1 # 从下一个epoch开始
+                log_message(f"Resuming training from epoch {start_epoch}")
+
+            if 'val_loss' in checkpoint and checkpoint['val_loss'] is not None: # 确保val_loss不是None
+                 best_val_loss = checkpoint['val_loss']
+                 log_message(f"Loaded best_val_loss: {best_val_loss:.4f}")
+            elif 'train_loss' in checkpoint and val_loader is None: # 如果没有验证集，用训练损失
+                 best_val_loss = checkpoint['train_loss']
+                 log_message(f"Loaded best_val_loss (from train_loss as no val_loader): {best_val_loss:.4f}")
+
+
+            if 'scheduler_state_dict' in checkpoint and scheduler is not None:
+                scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+            log_message("Loaded scheduler state_dict.")
+
+            log_message("Checkpoint loaded successfully.")
+        else:
+            log_message(f"Warning: Checkpoint file not found at {args.resume_checkpoint}. Starting from scratch.")
+            
+    for epoch in range(start_epoch, args.num_epochs + 1):
         model.train()
         total_train_loss_epoch = 0
         total_train_loss_p_epoch = 0 # <<< ADDED for detailed logging
@@ -349,7 +395,7 @@ def main(args):
                 optimizer.zero_grad()
                 
                 # <<< MODIFIED: Model now returns two outputs >>>
-                refined_seq, predicted_bone_lengths_seq = model(noisy_seq, bone_offsets_at_rest)
+                refined_seq, predicted_bone_lengths_seq = model(noisy_seq)
                 # predicted_bone_lengths_seq shape is (B, S, J)
                 
                 loss_p = criterion_pose(refined_seq, clean_seq)
@@ -358,6 +404,26 @@ def main(args):
 
                 # <<< ADDED: Calculate bone length loss >>>
                 target_canonical_bone_lengths = torch.norm(bone_offsets_at_rest, dim=-1) # Shape (B, J)
+                
+                '''
+                if batch_idx == 0 and epoch == 1: # 只在第一个 epoch 的第一个 batch 打印
+                    print(f"--- Bone Length Loss Debug (Epoch {epoch}, Batch {batch_idx}) ---")
+                    print(f"Shape of predicted_bone_lengths_seq: {predicted_bone_lengths_seq.shape}")
+                    print(f"Sample of predicted_bone_lengths_seq (B=0, S=0, J=0-5): {predicted_bone_lengths_seq[0, 0, :6].detach().cpu().numpy()}")
+                    print(f"Min/Max/Mean of predicted_bone_lengths_seq: "
+                          f"{predicted_bone_lengths_seq.min().item():.4e} / "
+                          f"{predicted_bone_lengths_seq.max().item():.4e} / "
+                          f"{predicted_bone_lengths_seq.mean().item():.4e}")
+                    
+                    print(f"Shape of target_canonical_bone_lengths: {target_canonical_bone_lengths.shape}")
+                    print(f"Sample of target_canonical_bone_lengths (B=0, J=0-5): {target_canonical_bone_lengths[0, :6].detach().cpu().numpy()}")
+                    print(f"Min/Max/Mean of target_canonical_bone_lengths: "
+                          f"{target_canonical_bone_lengths.min().item():.4f} / "
+                          f"{target_canonical_bone_lengths.max().item():.4f} / "
+                          f"{target_canonical_bone_lengths.mean().item():.4f}")
+                    print(f"bone_offsets_at_rest (sample [0, 0-2]): {bone_offsets_at_rest[0, :3, :].detach().cpu().numpy()}")
+                '''
+                
                 loss_b = criterion_bone(
                     predicted_bone_lengths_seq, 
                     target_canonical_bone_lengths, 
@@ -434,7 +500,11 @@ def main(args):
 
         model.eval()
         total_val_loss_epoch = 0
-        total_val_mpjpe_epoch = 0
+        # total_val_mpjpe_epoch = 0
+        
+        running_mpjpe_sum = 0.0
+        running_mpjpe_count = 0
+        
         total_val_loss_p_epoch = 0 # <<< ADDED for detailed logging
         total_val_loss_v_epoch = 0 # <<< ADDED
         total_val_loss_a_epoch = 0 # <<< ADDED
@@ -448,7 +518,7 @@ def main(args):
                     bone_offsets_at_rest_val = bone_offsets_at_rest_val.to(device) # <<< MODIFIED: var name
                     
                     # <<< MODIFIED: Model now returns two outputs >>>
-                    refined_seq_val, predicted_bone_lengths_seq_val = model(noisy_seq_val, bone_offsets_at_rest_val)
+                    refined_seq_val, predicted_bone_lengths_seq_val = model(noisy_seq_val)
                     
                     loss_p_val = criterion_pose(refined_seq_val, clean_seq_val)
                     loss_v_val = criterion_vel(refined_seq_val, clean_seq_val)
@@ -468,8 +538,15 @@ def main(args):
                                      args.w_tf_loss_bone * loss_b_val # <<< MODIFIED: Added bone loss
                                      
                     total_val_loss_epoch += val_loss_batch.item() * noisy_seq_val.size(0)
-                    mpjpe_batch = torch.norm(refined_seq_val - clean_seq_val, dim=(-1,-2)).mean() # MPJPE over joints and then mean over frames/batch
-                    total_val_mpjpe_epoch += mpjpe_batch.item() * noisy_seq_val.size(0)
+                    # mpjpe_batch = torch.norm(refined_seq_val - clean_seq_val, dim=(-1,-2)).mean() # MPJPE over joints and then mean over frames/batch
+                    # total_val_mpjpe_epoch += mpjpe_batch.item() * noisy_seq_val.size(0)
+                    error_vectors = refined_seq_val - clean_seq_val
+                    per_joint_errors = torch.norm(error_vectors, p=2, dim=-1)  # (B, S, J)
+                    
+                    running_mpjpe_sum += torch.sum(per_joint_errors).item()
+                    running_mpjpe_count += per_joint_errors.numel()
+                    
+                    
 
                     total_val_loss_p_epoch += loss_p_val.item() * noisy_seq_val.size(0) # <<< ADDED
                     total_val_loss_v_epoch += loss_v_val.item() * noisy_seq_val.size(0) # <<< ADDED
@@ -497,8 +574,10 @@ def main(args):
              continue
 
         avg_val_loss = total_val_loss_epoch / num_val_samples
-        avg_val_mpjpe = (total_val_mpjpe_epoch / num_val_samples) * 1000 # Convert to mm
-
+        
+        #avg_val_mpjpe = (total_val_mpjpe_epoch / num_val_samples) * 1000 # Convert to mm
+        avg_val_mpjpe = (running_mpjpe_sum / running_mpjpe_count) * 1000 if running_mpjpe_count > 0 else 0.0 # 转换为 mm
+        
         if args.model_type == 'transformer': # <<< ADDED: Detailed average val loss logging
             avg_val_p = total_val_loss_p_epoch / num_val_samples
             avg_val_v = total_val_loss_v_epoch / num_val_samples

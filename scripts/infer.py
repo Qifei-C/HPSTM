@@ -6,7 +6,7 @@ import argparse
 
 # Adjust imports based on your project structure
 from src.models.pose_refiner_transformer import ManifoldRefinementTransformer
-from src.models.pose_refiner_simple import PoseModel
+from src.models.pose_refiner_simple import PoseRefinerSimple
 from src.kinematics.forward_kinematics import ForwardKinematics
 from src.kinematics.skeleton_utils import get_skeleton_parents, get_rest_directions_dict # For simple model FK
 
@@ -23,11 +23,6 @@ def parse_args():
     parser.add_argument('--device', type=str, default="cuda" if torch.cuda.is_available() else "cpu",
                         help="Device to use for inference (cuda or cpu)")
     
-    # Optional: if bone offsets are needed and not part of checkpoint or derivable
-    parser.add_argument('--bone_offsets_path', type=str, default=None,
-                        help="Path to subject-specific T-pose bone offsets (.npy, shape (num_joints, 3)). "
-                             "Required by transformer model if not using canonical. "
-                             "If not provided, canonical/average offsets might be attempted if model supports.")
     args = parser.parse_args()
     return args
 
@@ -93,13 +88,12 @@ def load_model_from_checkpoint(checkpoint_path, device):
     return model, model_args # Return model_args as it contains window_size etc.
 
 
-def refine_sequence_transformer(model, noisy_r3j_sequence_np, bone_offsets_np, window_size, device):
+def refine_sequence_transformer(model, noisy_r3j_sequence_np, window_size, device):
     """
     Refines a single pose sequence using the ManifoldRefinementTransformer model.
     Args:
         model: The trained PyTorch model.
         noisy_r3j_sequence_np (np.ndarray): (num_frames, num_joints, 3)
-        bone_offsets_np (np.ndarray): (num_joints, 3) T-pose bone offsets.
         window_size (int): The window size the model was trained with.
         device: Torch device.
     Returns:
@@ -112,7 +106,6 @@ def refine_sequence_transformer(model, noisy_r3j_sequence_np, bone_offsets_np, w
         raise ValueError(f"Input sequence has {num_joints_data} joints, model expects {model.num_joints}.")
 
     noisy_r3j_sequence = torch.from_numpy(noisy_r3j_sequence_np).float().to(device)
-    bone_offsets = torch.from_numpy(bone_offsets_np).float().to(device) # (J, 3)
 
     original_num_frames = num_frames
     padding_start_len = 0
@@ -136,9 +129,9 @@ def refine_sequence_transformer(model, noisy_r3j_sequence_np, bone_offsets_np, w
     with torch.no_grad():
         for i in range(num_frames - window_size + 1):
             window_input = noisy_r3j_sequence[i : i + window_size].unsqueeze(0) # (1, W, J, 3)
-            batched_bone_offsets = bone_offsets.unsqueeze(0) # (1, J, 3)
 
-            refined_window = model(window_input, batched_bone_offsets).squeeze(0) # (W, J, 3)
+            refined_r3j_seq_window, _ = model(window_input)
+            refined_window = refined_r3j_seq_window.squeeze(0) # (W, J, 3)
 
             refined_frames_aggregated[i : i + window_size] += refined_window
             counts[i : i + window_size] += 1
@@ -221,15 +214,6 @@ def main(args):
         if noisy_input_np.shape[1] != num_joints_model:
              raise ValueError(f"Input sequence has {noisy_input_np.shape[1]} joints, but model was trained with {num_joints_model} joints.")
 
-        if args.bone_offsets_path:
-            bone_offsets_np = np.load(args.bone_offsets_path)
-            if bone_offsets_np.shape != (num_joints_model, 3):
-                raise ValueError(f"Bone offsets shape mismatch. Expected ({num_joints_model}, 3), got {bone_offsets_np.shape}")
-        else:
-            # This is a placeholder. A proper canonical offset should be defined or loaded.
-            print("Warning: bone_offsets_path not provided. Using zero bone offsets. This is likely incorrect.")
-            bone_offsets_np = np.zeros((num_joints_model, 3), dtype=np.float32)
-
         # If dataset was centered around root, apply the same transformation to input
         input_for_model = noisy_input_np.copy()
         root_positions_original_seq = None
@@ -238,7 +222,7 @@ def main(args):
             root_positions_original_seq = noisy_input_np[:, 0:1, :].copy() # (N, 1, 3)
             input_for_model = noisy_input_np - root_positions_original_seq
         
-        refined_output_centered = refine_sequence_transformer(model, input_for_model, bone_offsets_np, window_size, device)
+        refined_output_centered = refine_sequence_transformer(model, input_for_model, window_size, device)
         
         if center_around_root_dataset and root_positions_original_seq is not None:
             print("Adding back original root joint positions.")
