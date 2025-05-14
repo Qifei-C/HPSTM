@@ -12,18 +12,17 @@ if project_root not in sys.path:
 
 from src.kinematics.forward_kinematics import ForwardKinematics
 from src.kinematics.conversions import rodrigues_batch, quaternion_to_matrix #
-# 确保有 matrix_to_quaternion 或 axis_angle_to_quaternion 如果 use_quaternions=False
-# from src.kinematics.conversions import matrix_to_quaternion, axis_angle_to_quaternion # 假设这些存在
 from src.models.components.positional_encoding import PositionalEncoding
 import torch.nn.functional as F
-
+from src.kinematics.skeleton_utils import get_rest_directions_tensor, get_skeleton_parents
 
 class ManifoldRefinementTransformer(nn.Module):
     def __init__(self, num_joints, joint_dim, window_size,
                  d_model=256, nhead=8, num_encoder_layers=6, num_decoder_layers=6,
                  dim_feedforward=1024, dropout=0.1,
                  smpl_parents=None,
-                 use_quaternions=True):
+                 use_quaternions=True,
+                 skeleton_type='smpl_24'):
         super().__init__()
         self.num_joints = num_joints
         # joint_dim is the input dimension for each joint (e.g., 3 for R3J)
@@ -31,6 +30,7 @@ class ManifoldRefinementTransformer(nn.Module):
         self.window_size = window_size
         self.d_model = d_model
         self.use_quaternions = use_quaternions
+        self.skeleton_type = skeleton_type
 
         # Input embedding: num_joints * 3 (for R3J) -> d_model
         self.input_embedding = nn.Linear(num_joints * 3, d_model) # Assuming joint_dim is 3 for R3J input
@@ -63,13 +63,28 @@ class ManifoldRefinementTransformer(nn.Module):
         self.output_head = nn.Linear(d_model, self.total_pose_and_length_params)
 
         if smpl_parents is None:
-            raise ValueError("smpl_parents must be provided for FK.")
-        self.smpl_parents = smpl_parents
+            print(f"Warning: smpl_parents not provided directly to ManifoldRefinementTransformer. "
+                  f"Attempting to get from skeleton_utils using skeleton_type='{self.skeleton_type}'.")
+            # get_skeleton_parents 返回的是 NumPy 数组，FK 可能期望列表或Tensor，根据你的FK实现调整
+            loaded_parents = get_skeleton_parents(self.skeleton_type)
+            if loaded_parents is None:
+                raise ValueError(f"smpl_parents could not be determined for skeleton_type='{self.skeleton_type}'.")
+            self.smpl_parents = loaded_parents.tolist() # ForwardKinematics __init__ 中用 torch.tensor(parents_list)
+        else:
+            self.smpl_parents = smpl_parents if isinstance(smpl_parents, list) else smpl_parents.tolist()
         # FK layer can be instantiated once if canonical rest directions are used,
         # or if rest directions are passed to its forward method.
         # Current FK init takes canonical rest_directions.
+        
+        standard_rest_dirs = get_rest_directions_tensor(self.skeleton_type, use_placeholder=False)
+        if standard_rest_dirs.shape[0] != self.num_joints:
+            raise ValueError(f"Standard rest directions for skeleton_type '{self.skeleton_type}' "
+                             f"has {standard_rest_dirs.shape[0]} joints, but model is configured for {self.num_joints} joints.")
+        # 确保它是单位向量（get_rest_directions_tensor 应该保证这一点，但可以再次检查或归一化）
+        # standard_rest_dirs = F.normalize(standard_rest_dirs, p=2, dim=-1) # 如果不确定是否是单位向量
+        self.register_buffer('standard_unit_rest_dirs', standard_rest_dirs)
 
-    def forward(self, noisy_r3j_seq, bone_offsets_at_rest):
+    def forward(self, noisy_r3j_seq):
         """
         Args:
             noisy_r3j_seq (torch.Tensor): (batch_size, window_size, num_joints, 3)
@@ -108,20 +123,27 @@ class ManifoldRefinementTransformer(nn.Module):
 
         # 4. Output Head: Predict Pose Parameters and Bone Lengths
         all_params = self.output_head(batch_first_decoder_output) # (B, S, total_pose_and_length_params)
-
-        # Split params
         current_offset = 0
+        # Split params
         root_trans = all_params[..., current_offset : current_offset + self.dim_root_trans]
         current_offset += self.dim_root_trans
         root_orient_params = all_params[..., current_offset : current_offset + self.dim_root_orient]
         current_offset += self.dim_root_orient
         joint_rotations_params_flat = all_params[..., current_offset : current_offset + self.dim_joint_rotations]
         current_offset += self.dim_joint_rotations
-        predicted_bone_lengths = all_params[..., current_offset : current_offset + self.dim_bone_lengths] # (B, S, J)
+        
+        raw_predicted_bone_lengths = all_params[..., current_offset : current_offset + self.dim_bone_lengths] # (B, S, J)
+        
+        # if hasattr(self, '_print_counter_bone_lengths') is False: self._print_counter_bone_lengths = 0
+        # if self._print_counter_bone_lengths % 1000 == 0 and self.training and not torch.jit.is_scripting() and not torch.jit.is_tracing():
+        # print(f"--- Output Head Debug (ManifoldRefinementTransformer) ---")
+        # print(f"  Raw predicted_bone_lengths (before ReLU/Softplus) sample (B=0,S=0,J=0-5): {raw_predicted_bone_lengths[0,0,:6].detach().cpu().numpy()}")
+        # self._print_counter_bone_lengths +=1
         
         # Ensure predicted bone lengths are positive
-        predicted_bone_lengths = F.relu(predicted_bone_lengths) + 1e-6 
-
+        predicted_bone_lengths = F.softplus(raw_predicted_bone_lengths) + 1e-6 
+        
+        
         # Reshape joint rotations
         joint_rotations_params = joint_rotations_params_flat.reshape(
             batch_size, seq_len, self.num_joints, self.num_orient_params
@@ -132,10 +154,16 @@ class ManifoldRefinementTransformer(nn.Module):
         root_trans_flat = root_trans.reshape(-1, 3) # (B*S, 3)
         
         if self.use_quaternions:
+            '''Previous Calculation
             root_orient_quat_flat = F.normalize(root_orient_params.reshape(-1, 4), p=2, dim=-1) # (B*S, 4)
             local_joint_rot_quat_flat = F.normalize(
                 joint_rotations_params.reshape(-1, self.num_joints, 4), p=2, dim=-1 # Normalize per-joint quat
             ).reshape(-1, self.num_joints, 4) # (B*S, J, 4)
+            '''
+            root_orient_quat_flat = F.normalize(root_orient_params.reshape(-1, 4), p=2, dim=-1)
+            local_joint_rot_quat_flat = F.normalize(
+                joint_rotations_params.reshape(-1, self.num_joints, 4), p=2, dim=-1 # Norm over J,4 -> per quat
+            ).reshape(-1, self.num_joints, 4) 
         else:
             # Axis-angle to Quaternion conversion needed here
             # Placeholder - this will require a utility function
@@ -154,14 +182,24 @@ class ManifoldRefinementTransformer(nn.Module):
         # Prepare rest directions for FK initialization. These are canonical T-pose unit vectors.
         # We assume they are the same for all items in the batch for this single FK layer instance.
         # Taking from the first item in the batch.
-        canonical_offsets = bone_offsets_at_rest[0] # (J, 3) - full offsets for the first subject
-        canonical_unit_rest_dirs = F.normalize(canonical_offsets, p=2, dim=-1) # (J, 3) - unit vectors
+        # canonical_offsets = bone_offsets_at_rest[0] # (J, 3) - full offsets for the first subject
+        # canonical_unit_rest_dirs = F.normalize(canonical_offsets, p=2, dim=-1) # (J, 3) - unit vectors
 
         # Instantiate FK layer (once per forward pass is fine if rest dirs are canonical)
         fk_layer = ForwardKinematics(
             parents_list=self.smpl_parents,
-            rest_directions_dict_or_tensor=canonical_unit_rest_dirs
+            rest_directions_dict_or_tensor=self.standard_unit_rest_dirs
         )
+        
+        # if hasattr(self, '_print_counter_fk_input') is False: self._print_counter_fk_input = 0
+        # if self._print_counter_fk_input % 1000 == 0 and self.training and not torch.jit.is_scripting() and not torch.jit.is_tracing():
+        #     print(f"--- FK Input Debug (ManifoldRefinementTransformer) ---")
+        #     print(f"  root_orient_quat_flat shape: {root_orient_quat_flat.shape}, sample [0]: {root_orient_quat_flat[0].detach().cpu().numpy()}")
+        #     print(f"  root_trans_flat shape: {root_trans_flat.shape}, sample [0]: {root_trans_flat[0].detach().cpu().numpy()}")
+        #     print(f"  local_joint_rot_quat_flat shape: {local_joint_rot_quat_flat.shape}, sample [0,0]: {local_joint_rot_quat_flat[0,0,:].detach().cpu().numpy()}")
+        #     print(f"  fk_bone_lengths shape: {fk_bone_lengths.shape}, sample [0,0-5]: {fk_bone_lengths[0,:6].detach().cpu().numpy()}")
+        #     print(f"  self.standard_unit_rest_dirs sample [0-2]: {self.standard_unit_rest_dirs[:3,:].detach().cpu().numpy()}")
+        # self._print_counter_fk_input +=1
         
         # Perform batched FK for all frames in the batch
         refined_r3j_flat = fk_layer(

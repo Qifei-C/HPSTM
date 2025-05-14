@@ -90,6 +90,18 @@ class ForwardKinematics(nn.Module):
         """
         batch_size = root_position.shape[0]
         device = root_position.device
+        
+        if torch.rand(1).item() < 0.001: # 极小概率打印
+             print(f"--- FK Input Debug (ForwardKinematics.forward) ---")
+             print(f"  root_orientation_quat shape: {root_orientation_quat.shape}") # Expected (B*S, 4)
+             print(f"  root_position shape: {root_position.shape}")             # Expected (B*S, 3)
+             print(f"  local_joint_rotations_quat shape: {local_joint_rotations_quat.shape}") # Expected (B*S, J, 4)
+             print(f"  bone_lengths shape: {bone_lengths.shape}")                 # Expected (B*S, J)
+             if batch_size > 0:
+                 print(f"  root_orientation_quat sample [0]: {root_orientation_quat[0].detach().cpu().numpy()}")
+                 print(f"  root_position sample [0]: {root_position[0].detach().cpu().numpy()}")
+                 print(f"  local_joint_rotations_quat sample [0,0]: {local_joint_rotations_quat[0,0,:].detach().cpu().numpy()}")
+                 print(f"  bone_lengths sample [0,0-5]: {bone_lengths[0,:6].detach().cpu().numpy()}")
 
         # Normalize input quaternions to be safe
         root_orient_norm = root_orientation_quat / (torch.norm(root_orientation_quat, dim=-1, keepdim=True) + 1e-8)
