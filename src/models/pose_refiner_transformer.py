@@ -22,7 +22,8 @@ class ManifoldRefinementTransformer(nn.Module):
                  dim_feedforward=1024, dropout=0.1,
                  smpl_parents=None,
                  use_quaternions=True,
-                 skeleton_type='smpl_24'):
+                 skeleton_type='smpl_24',
+                 predict_covariance=True):
         super().__init__()
         self.num_joints = num_joints
         # joint_dim is the input dimension for each joint (e.g., 3 for R3J)
@@ -31,6 +32,7 @@ class ManifoldRefinementTransformer(nn.Module):
         self.d_model = d_model
         self.use_quaternions = use_quaternions
         self.skeleton_type = skeleton_type
+        self.predict_covariance = predict_covariance
 
         # Input embedding: num_joints * 3 (for R3J) -> d_model
         self.input_embedding = nn.Linear(num_joints * 3, d_model) # Assuming joint_dim is 3 for R3J input
@@ -60,15 +62,16 @@ class ManifoldRefinementTransformer(nn.Module):
                                             self.dim_joint_rotations + \
                                             self.dim_bone_lengths
                                             
-        self.output_head = nn.Linear(d_model, self.total_pose_and_length_params)
+        self.output_head_pose = nn.Linear(d_model, self.total_pose_and_length_params)
+        
+        self.dim_covariance_params_per_joint = 6 # L11, L21, L22, L31, L32, L33
+        self.total_covariance_params_dim = 0
+        if self.predict_covariance:
+            self.total_covariance_params_dim = self.num_joints * self.dim_covariance_params_per_joint
+            self.output_head_covariance = nn.Linear(d_model, self.total_covariance_params_dim)
 
         if smpl_parents is None:
-            print(f"Warning: smpl_parents not provided directly to ManifoldRefinementTransformer. "
-                  f"Attempting to get from skeleton_utils using skeleton_type='{self.skeleton_type}'.")
-            # get_skeleton_parents 返回的是 NumPy 数组，FK 可能期望列表或Tensor，根据你的FK实现调整
             loaded_parents = get_skeleton_parents(self.skeleton_type)
-            if loaded_parents is None:
-                raise ValueError(f"smpl_parents could not be determined for skeleton_type='{self.skeleton_type}'.")
             self.smpl_parents = loaded_parents.tolist() # ForwardKinematics __init__ 中用 torch.tensor(parents_list)
         else:
             self.smpl_parents = smpl_parents if isinstance(smpl_parents, list) else smpl_parents.tolist()
@@ -80,9 +83,8 @@ class ManifoldRefinementTransformer(nn.Module):
         if standard_rest_dirs.shape[0] != self.num_joints:
             raise ValueError(f"Standard rest directions for skeleton_type '{self.skeleton_type}' "
                              f"has {standard_rest_dirs.shape[0]} joints, but model is configured for {self.num_joints} joints.")
-        # 确保它是单位向量（get_rest_directions_tensor 应该保证这一点，但可以再次检查或归一化）
-        # standard_rest_dirs = F.normalize(standard_rest_dirs, p=2, dim=-1) # 如果不确定是否是单位向量
         self.register_buffer('standard_unit_rest_dirs', standard_rest_dirs)
+        
 
     def forward(self, noisy_r3j_seq):
         """
@@ -122,17 +124,17 @@ class ManifoldRefinementTransformer(nn.Module):
         batch_first_decoder_output = decoder_output.transpose(0, 1) # (B, S, d_model)
 
         # 4. Output Head: Predict Pose Parameters and Bone Lengths
-        all_params = self.output_head(batch_first_decoder_output) # (B, S, total_pose_and_length_params)
+        pose_params = self.output_head_pose(batch_first_decoder_output) # (B, S, pose_params_dim)
         current_offset = 0
         # Split params
-        root_trans = all_params[..., current_offset : current_offset + self.dim_root_trans]
+        root_trans = pose_params[..., current_offset : current_offset + self.dim_root_trans]
         current_offset += self.dim_root_trans
-        root_orient_params = all_params[..., current_offset : current_offset + self.dim_root_orient]
+        root_orient_params = pose_params[..., current_offset : current_offset + self.dim_root_orient]
         current_offset += self.dim_root_orient
-        joint_rotations_params_flat = all_params[..., current_offset : current_offset + self.dim_joint_rotations]
+        joint_rotations_params_flat = pose_params[..., current_offset : current_offset + self.dim_joint_rotations]
         current_offset += self.dim_joint_rotations
         
-        raw_predicted_bone_lengths = all_params[..., current_offset : current_offset + self.dim_bone_lengths] # (B, S, J)
+        raw_predicted_bone_lengths = pose_params[..., current_offset : current_offset + self.dim_bone_lengths] # (B, S, J)
         
         # if hasattr(self, '_print_counter_bone_lengths') is False: self._print_counter_bone_lengths = 0
         # if self._print_counter_bone_lengths % 1000 == 0 and self.training and not torch.jit.is_scripting() and not torch.jit.is_tracing():
@@ -211,6 +213,35 @@ class ManifoldRefinementTransformer(nn.Module):
 
         # Reshape back to (B, S, J, 3)
         refined_r3j_seq = refined_r3j_flat.reshape(batch_size, seq_len, self.num_joints, 3)
+        
+        cholesky_factors = None
+        if self.predict_covariance:
+            # decoder_output 是 (S, B, d_model), 我们需要 (B, S, d_model)
+            # batch_first_decoder_output 已经是 (B, S, d_model)
+            covariance_params_flat = self.output_head_covariance(batch_first_decoder_output) # (B, S, num_joints * 6)
+            
+            # 将参数重塑为 (B, S, J, 6)
+            covariance_params_per_joint = covariance_params_flat.reshape(
+                batch_size, seq_len, self.num_joints, self.dim_covariance_params_per_joint
+            )
+            
+            # 构建下三角Cholesky因子 L
+            # L = [[L00,  0,   0  ],
+            #      [L10, L11,  0  ],
+            #      [L20, L21, L22 ]]
+            # 参数顺序: L00, L10, L11, L20, L21, L22 (对应covariance_params_per_joint的最后一维)
+            
+            cholesky_L = torch.zeros(batch_size, seq_len, self.num_joints, 3, 3, device=noisy_r3j_seq.device)
+            
+            # 对角线元素通过softplus保证为正
+            cholesky_L[..., 0, 0] = F.softplus(covariance_params_per_joint[..., 0]) + 1e-6 # L00
+            cholesky_L[..., 1, 0] = covariance_params_per_joint[..., 1]                  # L10
+            cholesky_L[..., 1, 1] = F.softplus(covariance_params_per_joint[..., 2]) + 1e-6 # L11
+            cholesky_L[..., 2, 0] = covariance_params_per_joint[..., 3]                  # L20
+            cholesky_L[..., 2, 1] = covariance_params_per_joint[..., 4]                  # L21
+            cholesky_L[..., 2, 2] = F.softplus(covariance_params_per_joint[..., 5]) + 1e-6 # L22
+            
+            cholesky_factors = cholesky_L # (B, S, J, 3, 3)
 
         # Return both refined sequence and predicted lengths (for loss calculation)
-        return refined_r3j_seq, predicted_bone_lengths
+        return refined_r3j_seq, predicted_bone_lengths, cholesky_factors

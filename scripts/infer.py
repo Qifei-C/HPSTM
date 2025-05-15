@@ -37,6 +37,7 @@ def load_model_from_checkpoint(checkpoint_path, device):
     if 'model_constructor_args' not in checkpoint:
         raise KeyError("Checkpoint must contain 'model_constructor_args' for model instantiation.")
     model_args = checkpoint['model_constructor_args']
+    predict_covariance = model_args.get('predict_covariance_transformer', True) # 获取参数
     
     model_type = model_args.get('model_type', 'transformer') # Default to transformer if not specified
 
@@ -60,7 +61,8 @@ def load_model_from_checkpoint(checkpoint_path, device):
             dim_feedforward=model_args['dim_feedforward'],
             dropout=model_args['dropout'],
             smpl_parents=model_args['smpl_parents'], # Should be list
-            use_quaternions=model_args['use_quaternions']
+            use_quaternions=model_args['use_quaternions'],
+            predict_covariance=predict_covariance
         )
     # elif model_type == 'simple':
     #     # fk_module_instance = ForwardKinematics(
@@ -88,7 +90,7 @@ def load_model_from_checkpoint(checkpoint_path, device):
     return model, model_args # Return model_args as it contains window_size etc.
 
 
-def refine_sequence_transformer(model, noisy_r3j_sequence_np, window_size, device):
+def refine_sequence_transformer(model, noisy_r3j_sequence_np, window_size, device, predict_covariance=False):
     """
     Refines a single pose sequence using the ManifoldRefinementTransformer model.
     Args:
@@ -125,27 +127,52 @@ def refine_sequence_transformer(model, noisy_r3j_sequence_np, window_size, devic
 
     refined_frames_aggregated = torch.zeros_like(noisy_r3j_sequence)
     counts = torch.zeros(num_frames, device=device) 
+    
+    if predict_covariance:
+        # Cholesky L 是 (B, S, J, 3, 3)
+        # 我们需要聚合 (num_frames_padded, num_joints, 3, 3)
+        # 每个窗口的输出是 (window_size, num_joints, 3, 3)
+        aggregated_cholesky_L = torch.zeros(num_frames, model.num_joints, 3, 3, device=device)
+        # counts_cov = torch.zeros(num_frames, model.num_joints, device=device) # 如果需要更细致的平均
 
     with torch.no_grad():
         for i in range(num_frames - window_size + 1):
             window_input = noisy_r3j_sequence[i : i + window_size].unsqueeze(0) # (1, W, J, 3)
 
-            refined_r3j_seq_window, _ = model(window_input)
+            refined_r3j_seq_window, _, cholesky_L_window = model(window_input)
             refined_window = refined_r3j_seq_window.squeeze(0) # (W, J, 3)
 
             refined_frames_aggregated[i : i + window_size] += refined_window
             counts[i : i + window_size] += 1
+            
+            if predict_covariance and cholesky_L_window is not None:
+                cholesky_L_squeezed = cholesky_L_window.squeeze(0) # (W, J, 3, 3)
+                aggregated_cholesky_L[i : i + window_size] += cholesky_L_squeezed
+                # counts_cov[i : i + window_size] += 1 # 如果用单独的counts
     
     counts = counts.unsqueeze(-1).unsqueeze(-1).clamp(min=1) # Add J and D dims for broadcasting
     refined_sequence_padded = refined_frames_aggregated / counts
     
+    final_cholesky_L = None
+    if predict_covariance:
+        # counts_cov_reshaped = counts.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1).clamp(min=1) # (N_padded, 1, 1, 1) -> (N_padded, J, 3, 3)
+        counts_for_L = counts.view(num_frames, 1, 1, 1).clamp(min=1) # (N_padded, 1, 1, 1)
+        final_cholesky_L_padded = aggregated_cholesky_L / counts_for_L
+    
     # Remove padding if applied
     if original_num_frames < window_size:
         refined_sequence = refined_sequence_padded[padding_start_len : padding_start_len + original_num_frames]
+        if predict_covariance and final_cholesky_L_padded is not None:
+            final_cholesky_L = final_cholesky_L_padded[padding_start_len : padding_start_len + original_num_frames]
     else:
         refined_sequence = refined_sequence_padded
+        if predict_covariance and final_cholesky_L_padded is not None:
+            final_cholesky_L = final_cholesky_L_padded
 
-    return refined_sequence.cpu().numpy()
+    if predict_covariance:
+        return refined_sequence.cpu().numpy(), final_cholesky_L.cpu().numpy() if final_cholesky_L is not None else None
+    else:
+        return refined_sequence.cpu().numpy(), None
 
 # def refine_sequence_simple(model, pose_sequence_flat_np, window_size, device):
 #     """
@@ -195,6 +222,7 @@ def main(args):
     
     model_type = model_constructor_args.get('model_type', 'transformer')
     window_size = model_constructor_args['window_size']
+    predict_covariance = model_constructor_args.get('predict_covariance_transformer', False) # 获取参数
     num_joints_model = model_constructor_args['num_joints']
     center_around_root_dataset = model_constructor_args.get('center_around_root', True if model_type=='transformer' else False)
 
@@ -206,6 +234,7 @@ def main(args):
     print(f"Loaded input pose sequence from {args.input_pose_path} with shape {noisy_input_np.shape}")
 
     refined_output_sequence = None
+    cholesky_L_output = None
 
     if model_type == 'transformer':
         # Expected input: (num_frames, num_joints, 3)
@@ -222,7 +251,9 @@ def main(args):
             root_positions_original_seq = noisy_input_np[:, 0:1, :].copy() # (N, 1, 3)
             input_for_model = noisy_input_np - root_positions_original_seq
         
-        refined_output_centered = refine_sequence_transformer(model, input_for_model, window_size, device)
+        refined_output_centered, cholesky_L_centered = refine_sequence_transformer(
+            model, input_for_model, window_size, device, predict_covariance
+        )
         
         if center_around_root_dataset and root_positions_original_seq is not None:
             print("Adding back original root joint positions.")
@@ -230,8 +261,10 @@ def main(args):
             if refined_output_centered.shape[0] != root_positions_original_seq.shape[0]:
                  raise ValueError("Mismatch in frames between refined output and original root positions after padding/unpadding.")
             refined_output_sequence = refined_output_centered + root_positions_original_seq
+            cholesky_L_output = cholesky_L_centered 
         else:
             refined_output_sequence = refined_output_centered
+            cholesky_L_output = cholesky_L_centered 
 
 
     # elif model_type == 'simple':
@@ -248,6 +281,10 @@ def main(args):
     if refined_output_sequence is not None:
         np.save(args.output_path, refined_output_sequence)
         print(f"Refined sequence saved to {args.output_path} with shape {refined_output_sequence.shape}")
+        if cholesky_L_output is not None:
+            chol_path = os.path.splitext(args.output_path)[0] + "_cholesky_L.npy"
+            np.save(chol_path, cholesky_L_output)
+            print(f"Cholesky factors saved to {chol_path} with shape {cholesky_L_output.shape}")
     else:
         print("Inference did not produce an output.")
 

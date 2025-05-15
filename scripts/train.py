@@ -24,6 +24,7 @@ from src.kinematics.skeleton_utils import get_num_joints, get_skeleton_parents, 
 from src.losses.temporal_loss import VelocityLoss, AccelerationLoss
 from src.losses.position_loss import PositionMSELoss
 from src.losses.bone_length_loss import BoneLengthMSELoss
+from src.losses.covariance_loss import NegativeLogLikelihoodLoss 
 
 
 def parse_args():
@@ -31,6 +32,8 @@ def parse_args():
 
     parser.add_argument('--model_type', type=str, default='transformer', choices=['transformer', 'simple'],
                         help="Type of model to train ('transformer' or 'simple')")
+    parser.add_argument('--predict_covariance_transformer', type=lambda x: (str(x).lower() == 'true'), default=True, 
+                        help="Transformer: whether to predict covariance")
 
     parser.add_argument('--amass_root_dir', type=str, default=None,
                         help="Root directory containing AMASS .npz files (for 'transformer' model). Will be split into train/val.")
@@ -113,6 +116,8 @@ def parse_args():
 
     parser.add_argument('--run_name', type=str, default=f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
                         help="A name for this training run")
+    parser.add_argument('--w_tf_loss_cov', type=float, default=0.01, # 新增：协方差损失权重
+                        help="Weight for Transformer model's covariance (NLL) loss component.")
 
     args = parser.parse_args()
 
@@ -273,7 +278,8 @@ def main(args):
     model_constructor_args = {'model_type': args.model_type, 'num_joints': num_joints,
                               'window_size': args.window_size, 'skeleton_type': args.skeleton_type}
     criterion_bone = None # <<< ADDED: Initialize criterion_bone
-
+    criterion_cov = None
+    
     if args.model_type == 'transformer':
         model = ManifoldRefinementTransformer(
             num_joints=num_joints, # joint_dim will be 3 internally for R3J
@@ -287,12 +293,16 @@ def main(args):
             dropout=args.dropout_transformer,
             smpl_parents=skeleton_parents_np.tolist(),
             use_quaternions=args.use_quaternions_transformer,
-            skeleton_type=args.skeleton_type
+            skeleton_type=args.skeleton_type,
+            predict_covariance=args.predict_covariance_transformer
         ).to(device)
         criterion_pose = nn.L1Loss().to(device) # Or PositionMSELoss if you prefer
         criterion_vel = VelocityLoss(loss_type='l1').to(device)
         criterion_accel = AccelerationLoss(loss_type='l1').to(device)
         criterion_bone = BoneLengthMSELoss(parents_list=skeleton_parents_np.tolist()).to(device) # <<< ADDED: Init for Transformer
+        if args.predict_covariance_transformer: # 新增
+            criterion_cov = NegativeLogLikelihoodLoss().to(device)
+        
         model_constructor_args.update({
             'joint_dim': 3, 'd_model': args.d_model_transformer, 'nhead': args.nhead_transformer,
             'num_encoder_layers': args.num_encoder_layers_transformer,
@@ -384,6 +394,7 @@ def main(args):
         total_train_loss_v_epoch = 0 # <<< ADDED
         total_train_loss_a_epoch = 0 # <<< ADDED
         total_train_loss_b_epoch = 0 # <<< ADDED
+        total_train_loss_c_epoch = 0
 
         if args.model_type == 'transformer':
             # Dataloader for AMASS returns: noisy_seq, clean_seq, bone_offsets_at_rest
@@ -395,7 +406,7 @@ def main(args):
                 optimizer.zero_grad()
                 
                 # <<< MODIFIED: Model now returns two outputs >>>
-                refined_seq, predicted_bone_lengths_seq = model(noisy_seq)
+                refined_seq, predicted_bone_lengths_seq, pred_cholesky_L = model(noisy_seq)
                 # predicted_bone_lengths_seq shape is (B, S, J)
                 
                 loss_p = criterion_pose(refined_seq, clean_seq)
@@ -430,11 +441,16 @@ def main(args):
                     target_is_canonical_lengths=True # Use the flag from modified BoneLengthMSELoss
                 )
                 
+                loss_c = torch.tensor(0.0, device=device) # 初始化协方差损失
+                if args.predict_covariance_transformer and pred_cholesky_L is not None and criterion_cov is not None:
+                    loss_c = criterion_cov(clean_seq, refined_seq, pred_cholesky_L)
+                
                 loss = args.w_tf_loss_pose * loss_p + \
                        args.w_tf_loss_vel * loss_v + \
                        args.w_tf_loss_accel * loss_a + \
-                       args.w_tf_loss_bone * loss_b # <<< MODIFIED: Added bone loss with its weight
-                
+                       args.w_tf_loss_bone * loss_b + \
+                       args.w_tf_loss_cov * loss_c
+                       
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 optimizer.step()
@@ -444,10 +460,12 @@ def main(args):
                 total_train_loss_v_epoch += loss_v.item() # <<< ADDED
                 total_train_loss_a_epoch += loss_a.item() # <<< ADDED
                 total_train_loss_b_epoch += loss_b.item() # <<< ADDED
-
+                total_train_loss_c_epoch += loss_c.item()
+                
                 if batch_idx % 50 == 0:
                     log_message(f"Epoch {epoch} | Batch {batch_idx}/{len(train_loader)} | Train Loss: {loss.item():.4f} "
-                                f"(P: {loss_p.item():.4f} V: {loss_v.item():.4f} A: {loss_a.item():.4f} B: {loss_b.item():.4f})") # <<< MODIFIED: Log B
+                                f"(P: {loss_p.item():.4f} V: {loss_v.item():.4f} A: {loss_a.item():.4f} "
+                                f"B: {loss_b.item():.4f} C: {loss_c.item():.4f})")
 
         elif args.model_type == 'simple':
             # ... (simple model training loop - unchanged) ...
@@ -473,8 +491,10 @@ def main(args):
             avg_train_v = total_train_loss_v_epoch / len(train_loader)
             avg_train_a = total_train_loss_a_epoch / len(train_loader)
             avg_train_b = total_train_loss_b_epoch / len(train_loader)
+            avg_train_c = total_train_loss_c_epoch / len(train_loader) # 计算平均协方差损失
             log_message(f"Epoch {epoch}/{args.num_epochs} | Avg Train Loss: {avg_train_loss_epoch:.4f} "
-                        f"(P: {avg_train_p:.4f} V: {avg_train_v:.4f} A: {avg_train_a:.4f} B: {avg_train_b:.4f})")
+                        f"(P: {avg_train_p:.4f} V: {avg_train_v:.4f} A: {avg_train_a:.4f} "
+                        f"B: {avg_train_b:.4f} C: {avg_train_c:.4f})")
         else:
             log_message(f"Epoch {epoch}/{args.num_epochs} | Average Training Loss: {avg_train_loss_epoch:.4f}")
 
@@ -509,6 +529,7 @@ def main(args):
         total_val_loss_v_epoch = 0 # <<< ADDED
         total_val_loss_a_epoch = 0 # <<< ADDED
         total_val_loss_b_epoch = 0 # <<< ADDED
+        total_val_loss_c_epoch = 0
 
         with torch.no_grad():
             if args.model_type == 'transformer':
@@ -518,7 +539,7 @@ def main(args):
                     bone_offsets_at_rest_val = bone_offsets_at_rest_val.to(device) # <<< MODIFIED: var name
                     
                     # <<< MODIFIED: Model now returns two outputs >>>
-                    refined_seq_val, predicted_bone_lengths_seq_val = model(noisy_seq_val)
+                    refined_seq_val, predicted_bone_lengths_seq_val, pred_cholesky_L_val = model(noisy_seq_val)
                     
                     loss_p_val = criterion_pose(refined_seq_val, clean_seq_val)
                     loss_v_val = criterion_vel(refined_seq_val, clean_seq_val)
@@ -532,10 +553,15 @@ def main(args):
                         target_is_canonical_lengths=True
                     )
                     
+                    loss_c_val = torch.tensor(0.0, device=device) # 初始化
+                    if args.predict_covariance_transformer and pred_cholesky_L_val is not None and criterion_cov is not None:
+                        loss_c_val = criterion_cov(clean_seq_val, refined_seq_val, pred_cholesky_L_val)
+                    
                     val_loss_batch = args.w_tf_loss_pose * loss_p_val + \
                                      args.w_tf_loss_vel * loss_v_val + \
                                      args.w_tf_loss_accel * loss_a_val + \
-                                     args.w_tf_loss_bone * loss_b_val # <<< MODIFIED: Added bone loss
+                                     args.w_tf_loss_bone * loss_b_val + \
+                                     args.w_tf_loss_cov * loss_c_val
                                      
                     total_val_loss_epoch += val_loss_batch.item() * noisy_seq_val.size(0)
                     # mpjpe_batch = torch.norm(refined_seq_val - clean_seq_val, dim=(-1,-2)).mean() # MPJPE over joints and then mean over frames/batch
@@ -552,7 +578,7 @@ def main(args):
                     total_val_loss_v_epoch += loss_v_val.item() * noisy_seq_val.size(0) # <<< ADDED
                     total_val_loss_a_epoch += loss_a_val.item() * noisy_seq_val.size(0) # <<< ADDED
                     total_val_loss_b_epoch += loss_b_val.item() * noisy_seq_val.size(0) # <<< ADDED
-
+                    total_val_loss_c_epoch += loss_c_val.item() * noisy_seq_val.size(0) # 累加
 
             elif args.model_type == 'simple':
                 # ... (simple model validation loop - unchanged for its bone loss calculation) ...
@@ -583,8 +609,10 @@ def main(args):
             avg_val_v = total_val_loss_v_epoch / num_val_samples
             avg_val_a = total_val_loss_a_epoch / num_val_samples
             avg_val_b = total_val_loss_b_epoch / num_val_samples
+            avg_val_c = total_val_loss_c_epoch / num_val_samples
             log_message(f"Epoch {epoch} | Val Loss: {avg_val_loss:.4f} MPJPE: {avg_val_mpjpe:.2f}mm "
-                        f"(P: {avg_val_p:.4f} V: {avg_val_v:.4f} A: {avg_val_a:.4f} B: {avg_val_b:.4f})")
+                        f"(P: {avg_val_p:.4f} V: {avg_val_v:.4f} A: {avg_val_a:.4f} "
+                        f"B: {avg_val_b:.4f} C: {avg_val_c:.4f})")
         else:
             log_message(f"Epoch {epoch} | Validation Loss: {avg_val_loss:.4f} | Val MPJPE: {avg_val_mpjpe:.2f} mm")
 
@@ -602,9 +630,9 @@ def main(args):
             }
             if args.model_type == 'transformer':
                 checkpoint_payload['val_loss_components'] = {
-                    'P': avg_val_p, 'V': avg_val_v, 'A': avg_val_a, 'B': avg_val_b
+                    'P': avg_val_p, 'V': avg_val_v, 'A': avg_val_a, 'B': avg_val_b, 'C': avg_val_c
                 }
-                checkpoint_name = f"model_epoch_{epoch:03d}_valloss_{avg_val_loss:.4f}_mpjpe_{avg_val_mpjpe:.2f}_B_{avg_val_b:.4f}.pth"
+                checkpoint_name = f"model_epoch_{epoch:03d}_valloss_{avg_val_loss:.4f}_mpjpe_{avg_val_mpjpe:.2f}_B_{avg_val_b:.4f}_C_{avg_val_c:.4f}.pth"
             else:
                 checkpoint_name = f"model_epoch_{epoch:03d}_valloss_{avg_val_loss:.4f}_mpjpe_{avg_val_mpjpe:.2f}.pth"
             

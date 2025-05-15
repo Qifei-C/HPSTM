@@ -27,13 +27,76 @@ except ImportError as e:
     print("Please ensure the script is run from a location where 'src' and 'scripts' are accessible,")
     print(f"or that '{project_root}' is correctly added to PYTHONPATH.")
     sys.exit(1)
+    
+    
+def plot_covariance_ellipsoid(ax, mean_pos, cov_matrix, n_std=1.0, color='blue', alpha=0.1, **kwargs):
+    """
+    Plots a 3D covariance ellipsoid.
+    Args:
+        ax: Matplotlib 3D axis.
+        mean_pos (np.ndarray): (3,) array for the center of the ellipsoid.
+        cov_matrix (np.ndarray): (3, 3) covariance matrix.
+        n_std (float): Number of standard deviations for the ellipsoid size.
+        color (str): Color of the ellipsoid.
+        alpha (float): Alpha transparency.
+    Returns:
+        Matplotlib surface plot object (or None if cov_matrix is invalid).
+    """
+    try:
+        # Ensure covariance matrix is symmetric and try to make it positive definite
+        # by adding a small epsilon to the diagonal if needed for eigendecomposition.
+        # cov_matrix = (cov_matrix + cov_matrix.T) / 2
+        # min_eig = np.min(np.linalg.eigvalsh(cov_matrix))
+        # if min_eig < 0:
+        #     cov_matrix -= 1.01 * min_eig * np.eye(*cov_matrix.shape) # Make positive definite
+
+        eigenvalues, eigenvectors = np.linalg.eigh(cov_matrix) # For symmetric matrices
+
+        # Check for non-positive eigenvalues which can cause issues with sqrt
+        if np.any(eigenvalues <= 1e-9): # Use a small threshold
+            # print(f"Warning: Covariance matrix for joint at {mean_pos} has non-positive eigenvalues {eigenvalues}. Skipping ellipsoid.")
+            # You might see this if the predicted Cholesky factors are very small or zero.
+            return None
+
+
+    except np.linalg.LinAlgError:
+        # print(f"Warning: Singular covariance matrix for joint at {mean_pos}. Skipping ellipsoid.")
+        return None # Cannot plot if singular or eigendecomposition fails
+
+    # Radii are n_std * sqrt(eigenvalues)
+    radii = n_std * np.sqrt(eigenvalues)
+    if np.any(np.isnan(radii)) or np.any(np.isinf(radii)):
+        # print(f"Warning: NaN or Inf in radii for joint at {mean_pos}. Skipping ellipsoid.")
+        return None
+
+    # Generate points on a unit sphere
+    u = np.linspace(0.0, 2.0 * np.pi, 50) # Reduced for performance
+    v = np.linspace(0.0, np.pi, 25)  # Reduced for performance
+    x = np.outer(np.cos(u), np.sin(v))
+    y = np.outer(np.sin(u), np.sin(v))
+    z = np.outer(np.ones_like(u), np.cos(v))
+
+    # Transform points to ellipsoid
+    ellipsoid_points = np.stack((x, y, z), axis=-1) # (len_u, len_v, 3)
+    for i in range(len(ellipsoid_points)):
+        for j in range(len(ellipsoid_points[i])):
+            ellipsoid_points[i, j] = radii * ellipsoid_points[i, j] # Scale
+            ellipsoid_points[i, j] = eigenvectors @ ellipsoid_points[i, j] # Rotate
+            ellipsoid_points[i, j] += mean_pos # Translate
+
+    return ax.plot_surface(ellipsoid_points[...,0], ellipsoid_points[...,1], ellipsoid_points[...,2],
+                           rstride=2, cstride=2, color=color, alpha=alpha, linewidth=0, **kwargs)
+
 
 def _create_dual_animation(seq1_np: np.ndarray, seq2_np: np.ndarray,
+                           cholesky_L_seq1: np.ndarray | None, # 新增： noisy_input 的协方差 (通常为None)
+                           cholesky_L_seq2: np.ndarray | None, # 新增： refined_output 的协方差
                            title1: str, title2: str,
                            skeleton_type: str,
                            suptitle_extra_info: str = "",
                            fps: int = 30,
-                           center_around_root_in_plot: bool = True
+                           center_around_root_in_plot: bool = True,
+                           n_std_dev_ellipsoid: float = 1.0
                            ) -> FuncAnimation:
     if seq1_np.shape != seq2_np.shape or seq1_np.ndim != 3:
         raise ValueError(f"Sequence 1 ({seq1_np.shape}) and Sequence 2 ({seq2_np.shape}) must both have shape (T, J, 3)")
@@ -44,6 +107,7 @@ def _create_dual_animation(seq1_np: np.ndarray, seq2_np: np.ndarray,
     fig, (ax_seq1, ax_seq2) = plt.subplots(
         2, 1, figsize=(8.5, 17), subplot_kw={"projection": "3d"}
     )
+    fig.suptitle(f"Input vs. Output Animation {suptitle_extra_info}", fontsize=14)
 
     data_to_plot = []
     current_seq1_data = seq1_np.copy()
@@ -56,6 +120,7 @@ def _create_dual_animation(seq1_np: np.ndarray, seq2_np: np.ndarray,
             current_seq2_data[t_idx] -= current_seq2_data[t_idx, 0:1, :]
     
     data_to_plot.extend([current_seq1_data, current_seq2_data])
+    cholesky_L_list = [cholesky_L_seq1, cholesky_L_seq2]
 
     temp_concat_for_limits = np.concatenate(data_to_plot, axis=0)
     x_min_disp, x_max_disp = temp_concat_for_limits[..., 0].min(), temp_concat_for_limits[..., 0].max()
@@ -73,10 +138,12 @@ def _create_dual_animation(seq1_np: np.ndarray, seq2_np: np.ndarray,
     titles_str_list = (title1, title2)
     point_colors = ("red", "green") # Noisy (red), Refined (green)
     bone_colors = ("lightcoral", "lime")
+    ellipsoid_colors = ('salmon', 'lightgreen')
 
     scatters_list: list[plt.Artist] = []
     bone_lines_collection: list[list[plt.Line2D]] = []
     title_texts_list: list[plt.Text] = []
+    ellipsoid_plots_collection: list[list[plt.Artist | None]] = [[None]*J, [None]*J] # 存储每个关节的椭球对象
 
     for idx, ax in enumerate(axes):
         ax.set_xlim(mid_x - half_span, mid_x + half_span)
@@ -104,6 +171,19 @@ def _create_dual_animation(seq1_np: np.ndarray, seq2_np: np.ndarray,
                                 color=bone_colors[idx], linewidth=2)
             current_ax_bone_lines.append(line)
         bone_lines_collection.append(current_ax_bone_lines)
+        
+        current_cholesky_L_seq = cholesky_L_list[idx] # (T, J, 3, 3) or None
+        if current_cholesky_L_seq is not None:
+            cholesky_L_frame0 = current_cholesky_L_seq[0] # (J, 3, 3)
+            for j_idx in range(J):
+                L_joint = cholesky_L_frame0[j_idx] # (3, 3)
+                cov_matrix_joint = L_joint @ L_joint.T # (3, 3)
+                mean_pos_joint = pose0[j_idx] # (3,)
+                ellipsoid_plots_collection[idx][j_idx] = plot_covariance_ellipsoid(
+                    ax, mean_pos_joint, cov_matrix_joint, 
+                    n_std=n_std_dev_ellipsoid, color=ellipsoid_colors[idx], alpha=0.2 # 低alpha
+                )
+                
         ax.view_init(elev=15.0, azim=-75)
 
     def _update(frame: int):
@@ -113,6 +193,8 @@ def _create_dual_animation(seq1_np: np.ndarray, seq2_np: np.ndarray,
             scat = scatters_list[view_idx]
             lines_for_current_ax = bone_lines_collection[view_idx]
             title_obj = title_texts_list[view_idx]
+            current_cholesky_L_data_for_seq = cholesky_L_list[view_idx] # (T, J, 3, 3) or None
+            current_ellipsoid_plots_for_ax = ellipsoid_plots_collection[view_idx] # list of J artists or Nones
 
             scat._offsets3d = (current_pose[:, 0], current_pose[:, 1], current_pose[:, 2])
             artists.append(scat)
@@ -123,6 +205,27 @@ def _create_dual_animation(seq1_np: np.ndarray, seq2_np: np.ndarray,
                 lines_for_current_ax[line_i].set_3d_properties([current_pose[j_idx, 2], current_pose[parent_idx, 2]])
                 artists.append(lines_for_current_ax[line_i]); line_i += 1
             title_obj.set_text(f"{titles_str_list[view_idx]} — Frame {frame}/{T - 1}"); artists.append(title_obj)
+            
+            if current_cholesky_L_data_for_seq is not None:
+                cholesky_L_current_frame = current_cholesky_L_data_for_seq[frame] # (J, 3, 3)
+                for j_idx in range(J):
+                    # 移除旧的椭球 (如果存在)
+                    if current_ellipsoid_plots_for_ax[j_idx] is not None and \
+                       hasattr(current_ellipsoid_plots_for_ax[j_idx], 'remove'):
+                        current_ellipsoid_plots_for_ax[j_idx].remove()
+                    
+                    L_joint = cholesky_L_current_frame[j_idx] # (3,3)
+                    cov_matrix_joint = L_joint @ L_joint.T   # (3,3)
+                    mean_pos_joint = current_pose[j_idx]     # (3,)
+                    
+                    new_ellipsoid = plot_covariance_ellipsoid(
+                        axes[view_idx], mean_pos_joint, cov_matrix_joint,
+                        n_std=n_std_dev_ellipsoid, color=ellipsoid_colors[view_idx], alpha=0.2
+                    )
+                    ellipsoid_plots_collection[view_idx][j_idx] = new_ellipsoid
+                    if new_ellipsoid: # plot_covariance_ellipsoid 可能返回 None
+                        artists.append(new_ellipsoid)
+                        
         return artists
 
     interval_ms = max(20, int(1000 / fps))
@@ -153,6 +256,12 @@ def parse_vis_args():
     parser.add_argument('--outlier_prob', type=float, default=0.000)
     parser.add_argument('--outlier_scale', type=float, default=0.25)
     parser.add_argument('--bonelen_noise_scale', type=float, default=0.00)
+    parser.add_argument('--input_cholesky_L_path', type=str, default=None,
+                        help="(Optional) Path to the Cholesky L factors (.npy file) for the refined sequence. "
+                             "If not provided, ellipsoids for refined sequence won't be shown. "
+                             "Shape: (num_frames, num_joints, 3, 3)")
+    parser.add_argument('--n_std_dev_viz', type=float, default=1.0,
+                        help="Number of standard deviations to visualize for covariance ellipsoids.")
 
     args = parser.parse_args()
     return args
@@ -167,6 +276,9 @@ def main_visualize(args):
     # center_around_root_model_was_trained_with = model_constructor_args.get('center_around_root_amass', True)
     # The infer.py script's refine_sequence_transformer handles centering/decentering based on this automatically
     model_was_trained_on_centered_data = model_constructor_args.get('center_around_root_amass', True) # 默认 True
+    model_predicts_covariance = model_constructor_args.get('predict_covariance_transformer', True)
+    print(f"Model was configured to predict covariance: {model_predicts_covariance}") # <--- 添加打印
+    
     # 2. Load Clean Data and Bone Offsets from NPZ
     if not os.path.exists(args.input_npz_path):
         print(f"Error: Input NPZ file not found: {args.input_npz_path}")
@@ -254,9 +366,50 @@ def main_visualize(args):
     # Or centered, if it was True.
     # AMASSSubsetDataset provides noisy_input_for_model_np according to its center_around_root param.
     # This should align.
-    refined_sequence_np = refine_sequence_transformer(model, noisy_input_for_model_np, model_window_size, device)
+    refined_sequence_np, cholesky_L_output_np = refine_sequence_transformer(
+        model, noisy_input_for_model_np, model_window_size, device,
+        predict_covariance=model_predicts_covariance # 传递模型是否预测协方差的标志
+    )
     print(f"Inference complete. Refined sequence shape: {refined_sequence_np.shape}")
-
+    if cholesky_L_output_np is not None:
+        print(f"Cholesky L factors shape from inference: {cholesky_L_output_np.shape}")
+    
+    loaded_cholesky_L_for_refined = None
+    
+    if args.input_cholesky_L_path and os.path.exists(args.input_cholesky_L_path):
+        try:
+            loaded_cholesky_L_for_refined = np.load(args.input_cholesky_L_path)
+            print(f"Loaded external Cholesky L factors from: {args.input_cholesky_L_path}, shape: {loaded_cholesky_L_for_refined.shape}")
+            # 确保帧数匹配动画长度
+            if loaded_cholesky_L_for_refined.shape[0] > anim_frames_count:
+                loaded_cholesky_L_for_refined = loaded_cholesky_L_for_refined[:anim_frames_count]
+            elif loaded_cholesky_L_for_refined.shape[0] < anim_frames_count:
+                 print(f"Warning: Loaded Cholesky L has fewer frames ({loaded_cholesky_L_for_refined.shape[0]}) than animation ({anim_frames_count}). Will be padded implicitly by animation (might error or look odd).")
+                 # For simplicity, we let the animation logic handle shorter sequences if it can, or it might error.
+                 # A robust way would be to pad it here.
+        except Exception as e:
+            print(f"Error loading Cholesky L factors from {args.input_cholesky_L_path}: {e}")
+            loaded_cholesky_L_for_refined = None
+    
+    # 优先使用模型直接输出的协方差，如果模型预测了的话
+    cholesky_L_for_refined_anim = cholesky_L_output_np if model_predicts_covariance and cholesky_L_output_np is not None else loaded_cholesky_L_for_refined
+    
+    if cholesky_L_for_refined_anim is not None:
+         # 确保帧数对齐
+        if cholesky_L_for_refined_anim.shape[0] != refined_sequence_np.shape[0]:
+            print(f"Warning: Frame count mismatch between refined poses ({refined_sequence_np.shape[0]}) and "
+                  f"Cholesky L factors ({cholesky_L_for_refined_anim.shape[0]}). "
+                  f"Adjusting Cholesky L factors to {refined_sequence_np.shape[0]} frames.")
+            # Simple truncation or padding (e.g., repeat last frame's cov)
+            if cholesky_L_for_refined_anim.shape[0] > refined_sequence_np.shape[0]:
+                cholesky_L_for_refined_anim = cholesky_L_for_refined_anim[:refined_sequence_np.shape[0]]
+            else: # Pad if shorter
+                padding_needed = refined_sequence_np.shape[0] - cholesky_L_for_refined_anim.shape[0]
+                if padding_needed > 0:
+                    last_chol_L_frame = cholesky_L_for_refined_anim[-1:, ...] # Keep all J,3,3 dims
+                    padding_chol_L = np.repeat(last_chol_L_frame, padding_needed, axis=0)
+                    cholesky_L_for_refined_anim = np.concatenate([cholesky_L_for_refined_anim, padding_chol_L], axis=0)
+    
     # 5. Visualization
     # For visualization, we want all sequences in comparable coordinate frames.
     # refine_sequence_transformer should return absolute coordinates.
@@ -279,10 +432,13 @@ def main_visualize(args):
     print("Creating animation (Noisy Input vs. Refined Output)...")
     anim = _create_dual_animation(
         noisy_input_to_plot, refined_sequence_np,
+        None,
+        cholesky_L_for_refined_anim,
         "Noisy Input", "Refined Output",
         skeleton_type,
         suptitle_extra_info=f"Model: {Path(args.checkpoint_path).name}",
-        center_around_root_in_plot=args.center_plot
+        center_around_root_in_plot=args.center_plot,
+        n_std_dev_ellipsoid=args.n_std_dev_viz
     )
 
     output_path = Path(args.output_anim_path).expanduser().resolve()
@@ -313,7 +469,7 @@ if __name__ == "__main__":
     # Note: Use raw strings (r"...") or forward slashes for paths to avoid issues with backslashes.
     
     # Path to your trained model checkpoint
-    DEFAULT_CHECKPOINT_PATH = r"checkpoints/test/model_epoch_003_valloss_0.0157_mpjpe_28.93_B_0.0055.pth"
+    DEFAULT_CHECKPOINT_PATH = r"checkpoints/test/model_epoch_010_valloss_-0.0531_mpjpe_42.88_B_0.0068_C_-7.8237.pth"
     
     # Path to an input .npz file from your PROCESSED AMASS dataset
     # This file should contain 'poses_r3j' (clean poses) and 'bone_offsets'
@@ -332,9 +488,10 @@ if __name__ == "__main__":
             '--input_npz_path', DEFAULT_INPUT_NPZ,
             '--output_anim_path', DEFAULT_OUTPUT_ANIM,
             '--window_size_anim', '150', # Number of frames for animation
-            # '--center_plot', # Uncomment to center plots around root
+            '--center_plot', # Uncomment to center plots around root
             # You can also override default noise parameters here if needed for visualization
             # e.g., '--gaussian_noise_std', '0.01'
+            '--n_std_dev_viz', '0.5'
         ])
         print(f"Running with default/example arguments: {sys.argv[1:]}")
 
