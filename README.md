@@ -13,12 +13,12 @@ config:
 ---
 graph TD
     %% ----------  class definitions ----------
-    classDef input          fill:#a2d2ff,stroke:#333,stroke-width:1px,color:#000
-    classDef encoderdecoder fill:#bde0fe,stroke:#333,stroke-width:1px,color:#000
-    classDef outputhead     fill:#ffc8dd,stroke:#333,stroke-width:1px,color:#000
-    classDef fk             fill:#ffafcc,stroke:#333,stroke-width:1px,color:#000
-    classDef loss           fill:#caffbf,stroke:#333,stroke-width:1px,color:#000
-    classDef gt             fill:#fdffb6,stroke:#333,stroke-width:1px,color:#000
+    classDef input          fill:#a2d2ff,color:#000
+    classDef encoderdecoder fill:#bde0fe,color:#000
+    classDef outputhead     fill:#ffc8dd,color:#000
+    classDef fk             fill:#ffafcc,color:#000
+    classDef loss           fill:#caffbf,color:#000
+    classDef gt             fill:#fdffb6,color:#000
 
     %% ----------  node declarations ----------
     Input["Input: Noisy Pose Window (AMASS)<br>L × J × 3"]:::input
