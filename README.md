@@ -5,6 +5,9 @@
 ![License](https://img.shields.io/github/license/Qifei-C/HPSTM)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 
+![Model Arch](https://github.com/user-attachments/assets/45697ad7-d5e4-494c-9123-3745fe2fcb08)
+
+
 ## Overview
 
 This repository contains a PyTorch implementation of a pose refinement model designed to take a sequence of noisy 3D human joint positions and output a denoised, temporally smooth, and physically plausible 3D pose sequence. The model leverages a Transformer-based temporal encoder to capture long-range dependencies within a sliding window of frames and employs manifold constraints by representing poses as joint rotations with fixed bone lengths. A differentiable Forward Kinematics (FK) decoder reconstructs joint positions from this latent representation, ensuring anatomically consistent outputs. This approach is inspired by the concepts presented in SmoothNet and ManiPose.
@@ -12,6 +15,9 @@ This repository contains a PyTorch implementation of a pose refinement model des
   ![example_combo_noise](https://github.com/user-attachments/assets/4f92e8d5-a657-43cd-bdfa-7f919219c1b8)
 
 The core goal is to refine noisy 3D pose data (e.g., from 2D-to-3D pose estimators) by learning a low-dimensional manifold of valid human poses and applying temporal smoothing.
+
+![Video1](https://github.com/user-attachments/assets/bbcf0b59-bbf7-4eeb-a492-4bdd58623de5)
+
 
 ## Relation to the Genuine-ESFP Project
 
