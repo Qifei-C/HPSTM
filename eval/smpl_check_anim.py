@@ -52,17 +52,14 @@ if os.path.exists(processed_npz_path):
 
     if dataset and len(dataset) > 0:
         print(f"Dataset loaded successfully with {len(dataset)} windows.")
-        try:
-            _noisy_window_torch, clean_window_torch, _bone_offsets_torch = dataset[0]
-            print("Successfully got item [0] from dataset.")
-            all_frames_np = clean_window_torch.numpy()
-            print(f"Shape of the animation data (frames, joints, coords): {all_frames_np.shape}")
-            if np.isnan(all_frames_np).any() or np.isinf(all_frames_np).any():
-                print("WARNING: NaN or Inf values found in animation data! Animation might fail or look incorrect.")
-            else:
-                print("Animation data appears clean (no NaN/Inf).")
-        except Exception as e:
-            print(f"Error getting item from dataset or processing it: {e}")
+        _noisy_window_torch, clean_window_torch, _bone_offsets_torch = dataset[0]
+        print("Successfully got item [0] from dataset.")
+        all_frames_np = clean_window_torch.numpy()
+        print(f"Shape of the animation data (frames, joints, coords): {all_frames_np.shape}")
+        if np.isnan(all_frames_np).any() or np.isinf(all_frames_np).any():
+            print("WARNING: NaN or Inf values found in animation data! Animation might fail or look incorrect.")
+        else:
+            print("Animation data appears clean (no NaN/Inf).")
     else:
         print("Dataset could not be loaded from processed file or is empty.")
 else:

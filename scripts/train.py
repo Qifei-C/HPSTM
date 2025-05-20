@@ -52,7 +52,7 @@ def parse_args():
     parser.add_argument('--log_dir', type=str, default="results/logs",
                         help="Directory to save training logs")
 
-    # --- Dataset parameters ---
+    # Dataset parameters
     parser.add_argument('--skeleton_type', type=str, default='smpl_24',
                         help="Skeleton type (e.g., 'smpl_24') from skeleton_utils.py")
     parser.add_argument('--window_size', type=int, default=31,
@@ -79,7 +79,7 @@ def parse_args():
     parser.add_argument('--bonelen_noise_scale', type=float, default=0.0,
                         help="Maximum relative bone length perturbation scale for AMASS dataset")
 
-    # --- Transformer Model hyperparameters ---
+    # Transformer Model
     parser.add_argument('--d_model_transformer', type=int, default=256, help="Transformer: d_model")
     parser.add_argument('--nhead_transformer', type=int, default=8, help="Transformer: nhead")
     parser.add_argument('--num_encoder_layers_transformer', type=int, default=4, help="Transformer: num_encoder_layers")
@@ -88,14 +88,14 @@ def parse_args():
     parser.add_argument('--dropout_transformer', type=float, default=0.1, help="Transformer: dropout")
     parser.add_argument('--use_quaternions_transformer', type=bool, default=True, help="Transformer: use quaternions")
 
-    # --- Simple Model hyperparameters ---
-    parser.add_argument('--d_model_simple', type=int, default=96, help="SimpleRefiner: d_model")
-    parser.add_argument('--nhead_simple', type=int, default=8, help="SimpleRefiner: nhead")
-    parser.add_argument('--num_encoder_layers_simple', type=int, default=4, help="SimpleRefiner: num_encoder_layers")
-    parser.add_argument('--dim_feedforward_simple', type=int, default=256, help="SimpleRefiner: dim_feedforward")
-    parser.add_argument('--dropout_simple', type=float, default=0.1, help="SimpleRefiner: dropout")
+    # Simple Model hyperparameters
+    # parser.add_argument('--d_model_simple', type=int, default=96, help="SimpleRefiner: d_model")
+    # parser.add_argument('--nhead_simple', type=int, default=8, help="SimpleRefiner: nhead")
+    # parser.add_argument('--num_encoder_layers_simple', type=int, default=4, help="SimpleRefiner: num_encoder_layers")
+    # parser.add_argument('--dim_feedforward_simple', type=int, default=256, help="SimpleRefiner: dim_feedforward")
+    # parser.add_argument('--dropout_simple', type=float, default=0.1, help="SimpleRefiner: dropout")
 
-    # --- Training hyperparameters ---
+    # Training hyperparameters
     parser.add_argument('--batch_size', type=int, default=64, help="Batch size for training")
     parser.add_argument('--learning_rate', type=float, default=1e-4, help="Learning rate")
     parser.add_argument('--num_epochs', type=int, default=50, help="Number of training epochs")
@@ -105,7 +105,7 @@ def parse_args():
     parser.add_argument('--resume_checkpoint', type=str, default=None,
                         help="Path to the checkpoint file to resume training from (.pth)")
 
-    # --- Loss weights ---
+    # Loss weights
     parser.add_argument('--w_tf_loss_pose', type=float, default=1.0)
     parser.add_argument('--w_tf_loss_vel', type=float, default=0.5)
     parser.add_argument('--w_tf_loss_accel', type=float, default=1.0)
@@ -157,9 +157,9 @@ def main(args):
     else:
         log_message(f"Warning: skeleton_type is '{args.skeleton_type}'. Specific joint selection from SMPL+H is not applied.")
 
-    # --- Dataset and Dataloader ---
+    
     train_dataset, val_dataset = None, None
-    # ... (Dataset loading logic for AMASS or Simple, remains mostly the same) ...
+    
     if args.model_type == 'transformer':
         log_message(f"Loading AMASS dataset for Transformer model from root: {args.amass_root_dir}")
         if not os.path.isdir(args.amass_root_dir):
@@ -220,9 +220,8 @@ def main(args):
             )
         else:
             val_dataset = None
-    # ... (Simple model dataset loading - unchanged) ...
+
     elif args.model_type == 'simple':
-        # ... (your existing simple model dataset loading code) ...
         log_message("Loading PoseSequenceDataset for Simple model...")
         def load_sequences_from_paths(paths):
             loaded_seqs = []
@@ -274,15 +273,15 @@ def main(args):
         log_message(f"Training dataset size: {len(train_dataset)}, Validation dataset is empty or not created.")
 
 
-    # --- Model and Loss Criteria ---
+    # Model and Loss
     model_constructor_args = {'model_type': args.model_type, 'num_joints': num_joints,
                               'window_size': args.window_size, 'skeleton_type': args.skeleton_type}
-    criterion_bone = None # <<< ADDED: Initialize criterion_bone
+    criterion_bone = None
     criterion_cov = None
     
     if args.model_type == 'transformer':
         model = ManifoldRefinementTransformer(
-            num_joints=num_joints, # joint_dim will be 3 internally for R3J
+            num_joints=num_joints,
             joint_dim=3,
             window_size=args.window_size,
             d_model=args.d_model_transformer, 
@@ -296,11 +295,11 @@ def main(args):
             skeleton_type=args.skeleton_type,
             predict_covariance=args.predict_covariance_transformer
         ).to(device)
-        criterion_pose = nn.L1Loss().to(device) # Or PositionMSELoss if you prefer
+        criterion_pose = nn.L1Loss().to(device)
         criterion_vel = VelocityLoss(loss_type='l1').to(device)
         criterion_accel = AccelerationLoss(loss_type='l1').to(device)
-        criterion_bone = BoneLengthMSELoss(parents_list=skeleton_parents_np.tolist()).to(device) # <<< ADDED: Init for Transformer
-        if args.predict_covariance_transformer: # 新增
+        criterion_bone = BoneLengthMSELoss(parents_list=skeleton_parents_np.tolist()).to(device)
+        if args.predict_covariance_transformer:
             criterion_cov = NegativeLogLikelihoodLoss().to(device)
         
         model_constructor_args.update({
@@ -311,11 +310,11 @@ def main(args):
             'smpl_parents': skeleton_parents_np.tolist(),
             'use_quaternions': args.use_quaternions_transformer,
             'skeleton_type': args.skeleton_type
-            # 'center_around_root': args.center_around_root_amass # This is a dataset param, not model constr.
+            'center_around_root': args.center_around_root_amass
         })
 
     elif args.model_type == 'simple':
-        fk_module_instance = ForwardKinematics( # Ensure FK init matches your FK class
+        fk_module_instance = ForwardKinematics(
             parents_list=skeleton_parents_np.tolist(),
             rest_directions_dict_or_tensor=get_rest_directions_tensor(args.skeleton_type, use_placeholder=True)
         ).to(device)
@@ -329,7 +328,7 @@ def main(args):
             dropout=args.dropout_simple
         ).to(device)
         criterion_pose = PositionMSELoss().to(device)
-        criterion_bone = BoneLengthMSELoss(parents_list=skeleton_parents_np.tolist()).to(device) # Already here for simple
+        criterion_bone = BoneLengthMSELoss(parents_list=skeleton_parents_np.tolist()).to(device)
         model_constructor_args.update({
             'd_model': args.d_model_simple, 'nhead': args.nhead_simple,
             'num_encoder_layers': args.num_encoder_layers_simple,
@@ -353,7 +352,6 @@ def main(args):
             log_message(f"Loading checkpoint: {args.resume_checkpoint}")
             checkpoint = torch.load(args.resume_checkpoint, map_location=device)
             
-            # 检查模型参数是否匹配 (可选但推荐)
             current_model_dict = model.state_dict()
             loaded_state_dict = checkpoint['model_state_dict']
             new_state_dict = {k: v for k, v in loaded_state_dict.items() if k in current_model_dict.keys()}
@@ -361,20 +359,19 @@ def main(args):
             model.load_state_dict(current_model_dict)
             log_message(f"Loaded model state_dict. {len(new_state_dict)} keys matched.")
 
-            model.load_state_dict(checkpoint['model_state_dict']) # 标准加载
-            
+            model.load_state_dict(checkpoint['model_state_dict'])
             if 'optimizer_state_dict' in checkpoint:
                 optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
                 log_message("Loaded optimizer state_dict.")
             
             if 'epoch' in checkpoint:
-                start_epoch = checkpoint['epoch'] + 1 # 从下一个epoch开始
+                start_epoch = checkpoint['epoch'] + 1
                 log_message(f"Resuming training from epoch {start_epoch}")
 
-            if 'val_loss' in checkpoint and checkpoint['val_loss'] is not None: # 确保val_loss不是None
+            if 'val_loss' in checkpoint and checkpoint['val_loss'] is not None:
                  best_val_loss = checkpoint['val_loss']
                  log_message(f"Loaded best_val_loss: {best_val_loss:.4f}")
-            elif 'train_loss' in checkpoint and val_loader is None: # 如果没有验证集，用训练损失
+            elif 'train_loss' in checkpoint and val_loader is None:
                  best_val_loss = checkpoint['train_loss']
                  log_message(f"Loaded best_val_loss (from train_loss as no val_loader): {best_val_loss:.4f}")
 
@@ -390,58 +387,36 @@ def main(args):
     for epoch in range(start_epoch, args.num_epochs + 1):
         model.train()
         total_train_loss_epoch = 0
-        total_train_loss_p_epoch = 0 # <<< ADDED for detailed logging
-        total_train_loss_v_epoch = 0 # <<< ADDED
-        total_train_loss_a_epoch = 0 # <<< ADDED
-        total_train_loss_b_epoch = 0 # <<< ADDED
+        total_train_loss_p_epoch = 0 
+        total_train_loss_v_epoch = 0
+        total_train_loss_a_epoch = 0 
+        total_train_loss_b_epoch = 0 
         total_train_loss_c_epoch = 0
 
         if args.model_type == 'transformer':
-            # Dataloader for AMASS returns: noisy_seq, clean_seq, bone_offsets_at_rest
-            for batch_idx, (noisy_seq, clean_seq, bone_offsets_at_rest) in enumerate(train_loader): # <<< MODIFIED: var name bone_offsets -> bone_offsets_at_rest
+            for batch_idx, (noisy_seq, clean_seq, bone_offsets_at_rest) in enumerate(train_loader):
                 noisy_seq = noisy_seq.to(device)
-                clean_seq = clean_seq.to(device) # clean_seq shape is (B, S, J, 3)
-                bone_offsets_at_rest = bone_offsets_at_rest.to(device) # shape (B, J, 3)
+                clean_seq = clean_seq.to(device) # (B, S, J, 3)
+                bone_offsets_at_rest = bone_offsets_at_rest.to(device) # (B, J, 3)
                 
                 optimizer.zero_grad()
-                
-                # <<< MODIFIED: Model now returns two outputs >>>
+
                 refined_seq, predicted_bone_lengths_seq, pred_cholesky_L = model(noisy_seq)
-                # predicted_bone_lengths_seq shape is (B, S, J)
+                # (B, S, J)
                 
                 loss_p = criterion_pose(refined_seq, clean_seq)
                 loss_v = criterion_vel(refined_seq, clean_seq)
                 loss_a = criterion_accel(refined_seq, clean_seq)
 
-                # <<< ADDED: Calculate bone length loss >>>
                 target_canonical_bone_lengths = torch.norm(bone_offsets_at_rest, dim=-1) # Shape (B, J)
-                
-                '''
-                if batch_idx == 0 and epoch == 1: # 只在第一个 epoch 的第一个 batch 打印
-                    print(f"--- Bone Length Loss Debug (Epoch {epoch}, Batch {batch_idx}) ---")
-                    print(f"Shape of predicted_bone_lengths_seq: {predicted_bone_lengths_seq.shape}")
-                    print(f"Sample of predicted_bone_lengths_seq (B=0, S=0, J=0-5): {predicted_bone_lengths_seq[0, 0, :6].detach().cpu().numpy()}")
-                    print(f"Min/Max/Mean of predicted_bone_lengths_seq: "
-                          f"{predicted_bone_lengths_seq.min().item():.4e} / "
-                          f"{predicted_bone_lengths_seq.max().item():.4e} / "
-                          f"{predicted_bone_lengths_seq.mean().item():.4e}")
-                    
-                    print(f"Shape of target_canonical_bone_lengths: {target_canonical_bone_lengths.shape}")
-                    print(f"Sample of target_canonical_bone_lengths (B=0, J=0-5): {target_canonical_bone_lengths[0, :6].detach().cpu().numpy()}")
-                    print(f"Min/Max/Mean of target_canonical_bone_lengths: "
-                          f"{target_canonical_bone_lengths.min().item():.4f} / "
-                          f"{target_canonical_bone_lengths.max().item():.4f} / "
-                          f"{target_canonical_bone_lengths.mean().item():.4f}")
-                    print(f"bone_offsets_at_rest (sample [0, 0-2]): {bone_offsets_at_rest[0, :3, :].detach().cpu().numpy()}")
-                '''
                 
                 loss_b = criterion_bone(
                     predicted_bone_lengths_seq, 
                     target_canonical_bone_lengths, 
-                    target_is_canonical_lengths=True # Use the flag from modified BoneLengthMSELoss
+                    target_is_canonical_lengths=True
                 )
                 
-                loss_c = torch.tensor(0.0, device=device) # 初始化协方差损失
+                loss_c = torch.tensor(0.0, device=device)
                 if args.predict_covariance_transformer and pred_cholesky_L is not None and criterion_cov is not None:
                     loss_c = criterion_cov(clean_seq, refined_seq, pred_cholesky_L)
                 
@@ -456,10 +431,10 @@ def main(args):
                 optimizer.step()
                 
                 total_train_loss_epoch += loss.item()
-                total_train_loss_p_epoch += loss_p.item() # <<< ADDED
-                total_train_loss_v_epoch += loss_v.item() # <<< ADDED
-                total_train_loss_a_epoch += loss_a.item() # <<< ADDED
-                total_train_loss_b_epoch += loss_b.item() # <<< ADDED
+                total_train_loss_p_epoch += loss_p.item()
+                total_train_loss_v_epoch += loss_v.item()
+                total_train_loss_a_epoch += loss_a.item()
+                total_train_loss_b_epoch += loss_b.item()
                 total_train_loss_c_epoch += loss_c.item()
                 
                 if batch_idx % 50 == 0:
@@ -468,14 +443,13 @@ def main(args):
                                 f"B: {loss_b.item():.4f} C: {loss_c.item():.4f})")
 
         elif args.model_type == 'simple':
-            # ... (simple model training loop - unchanged) ...
             for batch_idx, (noisy_window_flat, target_center_flat) in enumerate(train_loader):
                 noisy_window_flat, target_center_flat = noisy_window_flat.to(device), target_center_flat.to(device)
                 optimizer.zero_grad()
                 pred_positions, pred_bone_lengths = model(noisy_window_flat)
                 target_center_positions_3d = target_center_flat.view(-1, num_joints, 3) # B*S_center, J, 3
                 loss_p = criterion_pose(pred_positions, target_center_positions_3d)
-                loss_b = criterion_bone(pred_bone_lengths, target_center_positions_3d) # Existing BoneLengthMSELoss takes (B,J) and (B,J,3)
+                loss_b = criterion_bone(pred_bone_lengths, target_center_positions_3d) # (B,J) and (B,J,3)
                 loss = args.w_simple_loss_pose * loss_p + args.w_simple_loss_bone * loss_b
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -486,12 +460,12 @@ def main(args):
 
 
         avg_train_loss_epoch = total_train_loss_epoch / len(train_loader)
-        if args.model_type == 'transformer': # <<< ADDED: Detailed average loss logging
+        if args.model_type == 'transformer':
             avg_train_p = total_train_loss_p_epoch / len(train_loader)
             avg_train_v = total_train_loss_v_epoch / len(train_loader)
             avg_train_a = total_train_loss_a_epoch / len(train_loader)
             avg_train_b = total_train_loss_b_epoch / len(train_loader)
-            avg_train_c = total_train_loss_c_epoch / len(train_loader) # 计算平均协方差损失
+            avg_train_c = total_train_loss_c_epoch / len(train_loader)
             log_message(f"Epoch {epoch}/{args.num_epochs} | Avg Train Loss: {avg_train_loss_epoch:.4f} "
                         f"(P: {avg_train_p:.4f} V: {avg_train_v:.4f} A: {avg_train_a:.4f} "
                         f"B: {avg_train_b:.4f} C: {avg_train_c:.4f})")
@@ -499,13 +473,12 @@ def main(args):
             log_message(f"Epoch {epoch}/{args.num_epochs} | Average Training Loss: {avg_train_loss_epoch:.4f}")
 
 
-        # --- Validation ---
+        # Validation
         if val_loader is None:
             log_message(f"Epoch {epoch} | No validation data. Skipping validation.")
             if avg_train_loss_epoch < best_val_loss:
                 best_val_loss = avg_train_loss_epoch
                 checkpoint_name = f"model_epoch_{epoch:03d}_trainloss_{avg_train_loss_epoch:.4f}.pth"
-                # ... (save checkpoint) ...
                 checkpoint_path = os.path.join(run_checkpoint_dir, checkpoint_name)
                 torch.save({
                     'epoch': epoch, 'model_state_dict': model.state_dict(),
@@ -520,32 +493,27 @@ def main(args):
 
         model.eval()
         total_val_loss_epoch = 0
-        # total_val_mpjpe_epoch = 0
-        
         running_mpjpe_sum = 0.0
         running_mpjpe_count = 0
         
-        total_val_loss_p_epoch = 0 # <<< ADDED for detailed logging
-        total_val_loss_v_epoch = 0 # <<< ADDED
-        total_val_loss_a_epoch = 0 # <<< ADDED
-        total_val_loss_b_epoch = 0 # <<< ADDED
+        total_val_loss_p_epoch = 0
+        total_val_loss_v_epoch = 0
+        total_val_loss_a_epoch = 0
+        total_val_loss_b_epoch = 0
         total_val_loss_c_epoch = 0
 
         with torch.no_grad():
             if args.model_type == 'transformer':
-                for noisy_seq_val, clean_seq_val, bone_offsets_at_rest_val in val_loader: # <<< MODIFIED: var name
+                for noisy_seq_val, clean_seq_val, bone_offsets_at_rest_val in val_loader:
                     noisy_seq_val = noisy_seq_val.to(device)
                     clean_seq_val = clean_seq_val.to(device)
-                    bone_offsets_at_rest_val = bone_offsets_at_rest_val.to(device) # <<< MODIFIED: var name
-                    
-                    # <<< MODIFIED: Model now returns two outputs >>>
+                    bone_offsets_at_rest_val = bone_offsets_at_rest_val.to(device)
                     refined_seq_val, predicted_bone_lengths_seq_val, pred_cholesky_L_val = model(noisy_seq_val)
                     
                     loss_p_val = criterion_pose(refined_seq_val, clean_seq_val)
                     loss_v_val = criterion_vel(refined_seq_val, clean_seq_val)
                     loss_a_val = criterion_accel(refined_seq_val, clean_seq_val)
 
-                    # <<< ADDED: Calculate bone length loss for validation >>>
                     target_canonical_bone_lengths_val = torch.norm(bone_offsets_at_rest_val, dim=-1)
                     loss_b_val = criterion_bone(
                         predicted_bone_lengths_seq_val,
@@ -553,7 +521,7 @@ def main(args):
                         target_is_canonical_lengths=True
                     )
                     
-                    loss_c_val = torch.tensor(0.0, device=device) # 初始化
+                    loss_c_val = torch.tensor(0.0, device=device)
                     if args.predict_covariance_transformer and pred_cholesky_L_val is not None and criterion_cov is not None:
                         loss_c_val = criterion_cov(clean_seq_val, refined_seq_val, pred_cholesky_L_val)
                     
@@ -564,8 +532,6 @@ def main(args):
                                      args.w_tf_loss_cov * loss_c_val
                                      
                     total_val_loss_epoch += val_loss_batch.item() * noisy_seq_val.size(0)
-                    # mpjpe_batch = torch.norm(refined_seq_val - clean_seq_val, dim=(-1,-2)).mean() # MPJPE over joints and then mean over frames/batch
-                    # total_val_mpjpe_epoch += mpjpe_batch.item() * noisy_seq_val.size(0)
                     error_vectors = refined_seq_val - clean_seq_val
                     per_joint_errors = torch.norm(error_vectors, p=2, dim=-1)  # (B, S, J)
                     
@@ -574,20 +540,19 @@ def main(args):
                     
                     
 
-                    total_val_loss_p_epoch += loss_p_val.item() * noisy_seq_val.size(0) # <<< ADDED
-                    total_val_loss_v_epoch += loss_v_val.item() * noisy_seq_val.size(0) # <<< ADDED
-                    total_val_loss_a_epoch += loss_a_val.item() * noisy_seq_val.size(0) # <<< ADDED
-                    total_val_loss_b_epoch += loss_b_val.item() * noisy_seq_val.size(0) # <<< ADDED
-                    total_val_loss_c_epoch += loss_c_val.item() * noisy_seq_val.size(0) # 累加
+                    total_val_loss_p_epoch += loss_p_val.item() * noisy_seq_val.size(0) 
+                    total_val_loss_v_epoch += loss_v_val.item() * noisy_seq_val.size(0)
+                    total_val_loss_a_epoch += loss_a_val.item() * noisy_seq_val.size(0)
+                    total_val_loss_b_epoch += loss_b_val.item() * noisy_seq_val.size(0)
+                    total_val_loss_c_epoch += loss_c_val.item() * noisy_seq_val.size(0)
 
             elif args.model_type == 'simple':
-                # ... (simple model validation loop - unchanged for its bone loss calculation) ...
                 for noisy_window_flat_val, target_center_flat_val in val_loader:
                     noisy_window_flat_val, target_center_flat_val = noisy_window_flat_val.to(device), target_center_flat_val.to(device)
                     pred_positions_val, pred_bone_lengths_val = model(noisy_window_flat_val)
                     target_center_positions_3d_val = target_center_flat_val.view(-1, num_joints, 3)
                     loss_p_val = criterion_pose(pred_positions_val, target_center_positions_3d_val)
-                    loss_b_val = criterion_bone(pred_bone_lengths_val, target_center_positions_3d_val) # Uses original mode of BoneLengthMSELoss
+                    loss_b_val = criterion_bone(pred_bone_lengths_val, target_center_positions_3d_val)
                     val_loss_batch = args.w_simple_loss_pose * loss_p_val + args.w_simple_loss_bone * loss_b_val
                     total_val_loss_epoch += val_loss_batch.item() * noisy_window_flat_val.size(0)
                     mpjpe_batch = torch.norm(pred_positions_val - target_center_positions_3d_val, dim=(-1,-2)).mean()
@@ -600,11 +565,9 @@ def main(args):
              continue
 
         avg_val_loss = total_val_loss_epoch / num_val_samples
+        avg_val_mpjpe = (running_mpjpe_sum / running_mpjpe_count) * 1000 if running_mpjpe_count > 0 else 0.0
         
-        #avg_val_mpjpe = (total_val_mpjpe_epoch / num_val_samples) * 1000 # Convert to mm
-        avg_val_mpjpe = (running_mpjpe_sum / running_mpjpe_count) * 1000 if running_mpjpe_count > 0 else 0.0 # 转换为 mm
-        
-        if args.model_type == 'transformer': # <<< ADDED: Detailed average val loss logging
+        if args.model_type == 'transformer':
             avg_val_p = total_val_loss_p_epoch / num_val_samples
             avg_val_v = total_val_loss_v_epoch / num_val_samples
             avg_val_a = total_val_loss_a_epoch / num_val_samples
@@ -620,7 +583,6 @@ def main(args):
 
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
-            # <<< MODIFIED: Include individual val losses in checkpoint if desired, e.g. for transformer >>>
             checkpoint_payload = {
                 'epoch': epoch, 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),

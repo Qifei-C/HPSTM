@@ -21,17 +21,6 @@ class PositionMSELoss(nn.Module):
                              f"vs target_positions {target_positions.shape}")
         return self.mse_loss(predicted_positions, target_positions)
 
-# For compatibility with your original naming if needed elsewhere, though class is preferred
 def pose_loss_mse(predicted_positions, target_positions):
     loss_fn = PositionMSELoss()
     return loss_fn(predicted_positions, target_positions)
-
-if __name__ == '__main__':
-    loss_fn = PositionMSELoss()
-    pred_pos = torch.randn(2, 24, 3)
-    true_pos = torch.randn(2, 24, 3)
-    loss = loss_fn(pred_pos, true_pos)
-    print("Position MSE Loss:", loss.item())
-
-    loss_func_style = pose_loss_mse(pred_pos, true_pos)
-    print("Position MSE Loss (func style):", loss_func_style.item())

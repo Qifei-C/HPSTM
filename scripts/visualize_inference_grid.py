@@ -4,15 +4,13 @@ import os
 import argparse
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, PillowWriter, FFMpegWriter
-from mpl_toolkits.mplot3d import Axes3D # Required for 3D projection
+from mpl_toolkits.mplot3d import Axes3D
 import sys
 from pathlib import Path
-import random # For selecting random NPZ files
-import glob # For finding NPZ files
-import shutil # For rmtree
+import random
+import glob
+import shutil
 
-# --- Setup Project Paths ---
-# This assumes the script is in Manifold/scripts/
 project_root = Path(__file__).resolve().parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
@@ -21,8 +19,7 @@ if str(project_root) not in sys.path:
 try:
     from src.models.pose_refiner_transformer import ManifoldRefinementTransformer
     from src.kinematics.skeleton_utils import get_skeleton_parents
-    from src.datasets.amass_dataset import AMASSSubsetDataset # To generate noisy data
-    # infer.py contains load_model_from_checkpoint and refine_sequence_transformer
+    from src.datasets.amass_dataset import AMASSSubsetDataset
     from scripts.infer import load_model_from_checkpoint, refine_sequence_transformer
 except ImportError as e:
     print(f"Error importing project modules: {e}")
@@ -30,12 +27,11 @@ except ImportError as e:
     print(f"or that '{project_root}' is correctly added to PYTHONPATH.")
     sys.exit(1)
 
-# _create_grid_animation function remains the same as in the previous version
 def _create_grid_animation(
     clean_sequences_list: list[np.ndarray],
     noisy_sequences_list: list[np.ndarray],
     refined_sequences_list: list[np.ndarray],
-    sequence_source_info: list[str], # e.g., NPZ filenames
+    sequence_source_info: list[str],
     skeleton_type: str,
     suptitle_extra_info: str = "",
     fps: int = 30,
@@ -45,21 +41,17 @@ def _create_grid_animation(
     if not (num_rows == len(noisy_sequences_list) == len(refined_sequences_list) == len(sequence_source_info)):
         raise ValueError("All sequence lists and source info must have the same length (number of rows).")
     if num_rows == 0:
-        # This case should be handled before calling, but as a safeguard:
         print("Warning: _create_grid_animation called with no sequences.")
-        # Create an empty figure or raise error, depending on desired behavior for no data
         fig, _ = plt.subplots()
-        plt.close(fig) # Close immediately
-        return fig # Or raise error
+        plt.close(fig)
+        return fig
 
     T_common_list = [seq.shape[0] for seq in clean_sequences_list]
     if not all(t == T_common_list[0] for t in T_common_list):
-        # This check might be too strict if we allow variable lengths from upstream,
-        # but the script aims for args.window_size_anim for all.
         print(f"Warning: Not all clean sequences have the same number of frames. Using frames from first sequence: {T_common_list[0]}")
-    T_common = T_common_list[0] # Number of frames for animation, should be consistent
+    T_common = T_common_list[0]
     
-    J_common = clean_sequences_list[0].shape[1] # Number of joints
+    J_common = clean_sequences_list[0].shape[1]
 
     for i in range(num_rows):
         for seq_list_idx, (seq_list, name) in enumerate(zip(
@@ -70,20 +62,15 @@ def _create_grid_animation(
             if seq.ndim != 3 or seq.shape[2] != 3:
                 raise ValueError(f"{name} sequence {i} ('{sequence_source_info[i]}') must have shape (T, J, 3), got {seq.shape}")
             if seq.shape[0] != T_common:
-                # This means upstream logic didn't perfectly enforce T_common for all visualised sequences
-                # For animation, FuncAnimation uses frames from the first sequence or a specified 'frames' count.
-                # We ensure all data passed here has T_common frames.
                 raise ValueError(f"{name} sequence {i} ('{sequence_source_info[i]}') has {seq.shape[0]} frames, expected {T_common}. Check processing logic.")
             if seq.shape[1] != J_common:
                 raise ValueError(f"{name} sequence {i} ('{sequence_source_info[i]}') has {seq.shape[1]} joints, expected {J_common}")
 
 
     skeleton_parents = get_skeleton_parents(skeleton_type)
-
     fig, axes = plt.subplots(
         num_rows, 3, figsize=(18, 6 * num_rows), subplot_kw={"projection": "3d"}, squeeze=False
     )
-    # squeeze=False ensures 'axes' is always 2D, even if num_rows is 1.
 
     fig.suptitle(f"Clean vs. Noisy vs. Refined ({suptitle_extra_info})", fontsize=16)
 
@@ -99,7 +86,6 @@ def _create_grid_animation(
     if center_around_root_in_plot:
         print("Centering all sequences around their respective root joints for plotting.")
         for i_seq_flat in range(len(all_sequences_for_plotting_flat)):
-            # This modifies the copies in data_for_subplots as they are the same objects
             seq_data_flat = all_sequences_for_plotting_flat[i_seq_flat]
             root_trajectory = seq_data_flat[:, 0:1, :].copy()
             for t_idx in range(seq_data_flat.shape[0]):
@@ -147,9 +133,8 @@ def _create_grid_animation(
             ax.set_ylabel(y_label_str if c_idx == 0 else "Y")
             ax.set_zlabel("Z")
             
-            if c_idx == 0: # Adjust label padding for the first column's Y label
+            if c_idx == 0:
                 ax.yaxis.label.set_fontsize(10)
-                # ax.yaxis.set_label_coords(-0.15, 0.5) # May need adjustment based on figure size
 
             title_obj = ax.set_title(f"{subplot_titles_base[c_idx]} — Frame 0/{T_common - 1}")
             title_texts_collection[r_idx][c_idx] = title_obj
@@ -179,7 +164,6 @@ def _create_grid_animation(
         artists_to_return: list[plt.Artist] = []
         for r_idx_update in range(num_rows):
             for c_idx_update in range(3):
-                # Ensure frame index is valid for potentially shorter actual data if T_common was from elsewhere
                 current_frame_idx = min(frame, data_for_subplots[r_idx_update][c_idx_update].shape[0] - 1)
                 current_pose = data_for_subplots[r_idx_update][c_idx_update][current_frame_idx]
                 
@@ -205,14 +189,11 @@ def _create_grid_animation(
                 artists_to_return.append(title_obj)
         return artists_to_return
 
-    plt.tight_layout(rect=[0, 0.02, 1, 0.96]) # Adjust for suptitle and bottom
+    plt.tight_layout(rect=[0, 0.02, 1, 0.96])
     interval_ms = max(20, int(1000 / fps))
-    # The 'frames' argument for FuncAnimation determines how many times _update is called.
-    # This should be T_common, which is args.window_size_anim based on successful processing.
+    
     return FuncAnimation(fig, _update, frames=T_common, interval=interval_ms, blit=False)
 
-
-# parse_vis_args function remains the same
 def parse_vis_args():
     parser = argparse.ArgumentParser(description="Visualize Inference of Human Pose Smoothing Model")
     parser.add_argument('--checkpoint_path', type=str, required=True,
@@ -229,7 +210,6 @@ def parse_vis_args():
                         help="Required number of frames from each input NPZ to use for animation. Files shorter than this will be skipped.")
     parser.add_argument('--center_plot', action='store_true',
                         help="Center poses around root joint for visualization display.")
-    # Noise parameters
     parser.add_argument('--gaussian_noise_std', type=float, default=0.01) 
     parser.add_argument('--temporal_noise_type', type=str, default='filtered', choices=['none', 'filtered', 'persistent'])
     parser.add_argument('--temporal_noise_scale', type=float, default=0.01)
@@ -247,13 +227,13 @@ def main_visualize(args):
     device = torch.device(args.device)
     random.seed(42) 
 
-    # 1. Load Model
+    # Model
     model, model_constructor_args = load_model_from_checkpoint(args.checkpoint_path, device)
     model_window_size = model_constructor_args['window_size']
     skeleton_type = model_constructor_args.get('skeleton_type', 'smpl_24')
     model_was_trained_on_centered_data = model_constructor_args.get('center_around_root_amass', True)
 
-    # 2. Find NPZ Files
+    # NPZ
     if not os.path.isdir(args.input_npz_root_dir):
         print(f"Error: Input NPZ root directory not found: {args.input_npz_root_dir}")
         return
@@ -263,7 +243,7 @@ def main_visualize(args):
         print(f"Error: No .npz files found in {args.input_npz_root_dir} or its subdirectories.")
         return
     
-    random.shuffle(all_npz_files) # Shuffle to try different files if some are too short
+    random.shuffle(all_npz_files)
 
     all_clean_sequences = []
     all_noisy_sequences_for_plot = []
@@ -273,8 +253,6 @@ def main_visualize(args):
     target_num_sequences = args.num_sequences_to_visualize
     files_attempted_idx = 0
 
-    # Define noisy_dataset_args structure once, update specific paths later
-    # Note: window_size for dataset should be args.window_size_anim as we select files of this length
     base_noisy_dataset_args = dict(
         window_size=args.window_size_anim, 
         skeleton_type=skeleton_type,
@@ -300,8 +278,8 @@ def main_visualize(args):
         print(f"\nAttempting sequence {len(all_clean_sequences) + 1}/{target_num_sequences} (File {files_attempted_idx}/{len(all_npz_files)}): {npz_path.name}")
         
         current_file_processed_successfully = False
-        temp_dir = None # Initialize temp_dir to ensure it's cleaned up if created
-
+        temp_dir = None
+        
         try:
             data_npz = np.load(npz_path, allow_pickle=True)
             if 'poses_r3j' not in data_npz or 'bone_offsets' not in data_npz:
@@ -318,8 +296,7 @@ def main_visualize(args):
                 print(f"  Info: Sequence in {npz_path.name} has {clean_poses_r3j_full.shape[0]} frames, "
                       f"less than required window_size_anim {args.window_size_anim}. Skipping.")
                 continue
-                
-            # Sequence length is sufficient, use args.window_size_anim frames
+
             current_anim_frames = args.window_size_anim 
             current_clean_sequence_np = clean_poses_r3j_full[:current_anim_frames]
             
@@ -329,9 +306,7 @@ def main_visualize(args):
                       f"expected ({model.num_joints}, 3). Skipping.")
                 continue
 
-            # 3. Generate Noisy Input
             print("  Generating noisy input sequence...")
-            # Use a unique temp_dir name for each attempt to avoid conflicts if script is interrupted
             temp_dir = Path(f"temp_vis_data_{npz_path.stem}_{os.getpid()}_{len(all_clean_sequences)}")
             os.makedirs(temp_dir, exist_ok=True)
             temp_npz_path = temp_dir / "temp_clean_seq.npz"
@@ -341,10 +316,9 @@ def main_visualize(args):
             try:
                 current_noisy_dataset_args = base_noisy_dataset_args.copy()
                 current_noisy_dataset_args['data_paths'] = [str(temp_npz_path)]
-                # window_size in base_noisy_dataset_args is already args.window_size_anim
-                
                 noisy_data_generator = AMASSSubsetDataset(**current_noisy_dataset_args)
-                if not noisy_data_generator: # Check if dataset is empty (e.g., file not found by loader)
+                
+                if not noisy_data_generator:
                     raise ValueError(f"Noisy data generator is empty for {npz_path.name} (path: {temp_npz_path}).")
 
                 noisy_input_for_model_torch, _clean_target_from_gen, _bone_offsets_from_gen = noisy_data_generator[0]
@@ -352,14 +326,12 @@ def main_visualize(args):
 
             except Exception as e_noise:
                 print(f"  Error generating noisy data for {npz_path.name}: {e_noise}. Skipping this file.")
-                # temp_dir will be cleaned in the outer finally
                 continue 
             
-            if noisy_input_for_model_np is None: # Should be caught by exception, but as a safeguard
+            if noisy_input_for_model_np is None:
                  print(f"  Failed to generate noisy data for {npz_path.name} (returned None). Skipping this file.")
                  continue
 
-            # Ensure noisy sequence has same T as clean sequence for this animation window
             if noisy_input_for_model_np.shape[0] != current_anim_frames:
                  print(f"  Warning: Noisy sequence length {noisy_input_for_model_np.shape[0]} for {npz_path.name} "
                        f"does not match anim frames {current_anim_frames}. Using slice.")
@@ -370,7 +342,7 @@ def main_visualize(args):
                      continue
 
 
-            # 4. Perform Inference
+            # Inference
             print("  Performing inference...")
             current_refined_sequence_np = refine_sequence_transformer(model, noisy_input_for_model_np.copy(), model_window_size, device)
             print(f"  Inference complete for {npz_path.name}. Refined sequence shape: {current_refined_sequence_np.shape}")
@@ -384,13 +356,13 @@ def main_visualize(args):
                            f"after adjustment. Required {current_anim_frames}. Skipping this file.")
                      continue
 
-            # 5. Prepare sequences for plotting (handle potential centering by dataset)
+            # plotting
             noisy_input_to_plot = noisy_input_for_model_np.copy()
             if model_was_trained_on_centered_data:
                 original_clean_root_for_noisy = current_clean_sequence_np[:, 0:1, :].copy()
                 if noisy_input_to_plot.shape[0] == original_clean_root_for_noisy.shape[0]:
                      noisy_input_to_plot += original_clean_root_for_noisy
-                else: # Should not happen if previous checks passed
+                else:
                     print(f"  Warning: Shape mismatch for de-centering noisy data for {npz_path.name}. "
                           f"Noisy: {noisy_input_to_plot.shape[0]}, Clean root: {original_clean_root_for_noisy.shape[0]}. "
                           "Plotting noisy as is (potentially centered).")
@@ -399,10 +371,9 @@ def main_visualize(args):
 
         except Exception as e_outer: 
             print(f"  An unexpected error occurred while processing {npz_path.name}: {e_outer}. Skipping this file.")
-            # traceback.print_exc() # Uncomment for detailed debugging
             continue 
         finally:
-            if temp_dir and temp_dir.exists(): # Ensure temp_dir is defined and exists
+            if temp_dir and temp_dir.exists():
                  shutil.rmtree(temp_dir, ignore_errors=True)
 
 
@@ -410,12 +381,9 @@ def main_visualize(args):
             all_clean_sequences.append(current_clean_sequence_np)
             all_noisy_sequences_for_plot.append(noisy_input_to_plot)
             all_refined_sequences.append(current_refined_sequence_np)
-            all_sequence_source_names.append(npz_path.name) # Store just filename for plot label
+            all_sequence_source_names.append(npz_path.name)
             print(f"  Successfully processed and added {npz_path.name}. Total sequences: {len(all_clean_sequences)}.")
-        # else: (Implicitly)
-            # print(f"  Skipped {npz_path.name} due to an issue during processing.") # Covered by specific info/error messages
 
-    # After the while loop:
     if len(all_clean_sequences) == 0:
         print("\nNo sequences could be successfully processed that met all criteria (length, data integrity, processing steps). Exiting.")
         return
@@ -427,7 +395,7 @@ def main_visualize(args):
         print(f"\nSuccessfully processed {len(all_clean_sequences)} sequences as requested.")
 
 
-    # 6. Create Grid Animation
+    # Grid Animation
     print("\nCreating grid animation (this may take a while)...")
     anim = _create_grid_animation(
         all_clean_sequences,
@@ -448,7 +416,6 @@ def main_visualize(args):
         if file_ext == ".gif":
             writer = PillowWriter(fps=30, bitrate=1800) 
         elif file_ext == ".mp4":
-            # Check if ffmpeg is available for FFMpegWriter
             if shutil.which("ffmpeg") is None:
                 print("Error: ffmpeg not found. Cannot save as .mp4. Please install ffmpeg and ensure it's in your PATH.")
                 print("Animation not saved. You can try saving as .gif instead.")
@@ -463,8 +430,6 @@ def main_visualize(args):
         print(f"Animation saved to {output_path}")
     except Exception as e:
         print(f"Error saving animation: {e}")
-        # import traceback
-        # traceback.print_exc()
         if file_ext == ".mp4":
             print("If saving to MP4 and ffmpeg is installed, ensure it's the correct version or try reinstalling.")
             print("You might also need to install codecs like libx264: `conda install x264 ffmpeg` or `sudo apt-get install libx264-dev ffmpeg`")
@@ -474,11 +439,11 @@ def main_visualize(args):
 
 
 if __name__ == "__main__":
-    DEFAULT_CHECKPOINT_PATH = r"checkpoints/test/model_epoch_003_valloss_0.0157_mpjpe_28.93_B_0.0055.pth" # REPLACE
-    DEFAULT_INPUT_NPZ_ROOT_DIR = r"data/" # REPLACE 
+    DEFAULT_CHECKPOINT_PATH = r"checkpoints/test/model_epoch_003_valloss_0.0157_mpjpe_28.93_B_0.0055.pth"
+    DEFAULT_INPUT_NPZ_ROOT_DIR = r"data/"
     DEFAULT_OUTPUT_ANIM = r"visualized_output/grid_comparison_animation_long.mp4" 
     DEFAULT_NUM_SEQUENCES = 3 
-    DEFAULT_WINDOW_SIZE_ANIM = 150 # Files shorter than this will be skipped
+    DEFAULT_WINDOW_SIZE_ANIM = 150
 
     if len(sys.argv) == 1: 
         print("No command line arguments given, using default/example arguments for visualization.")
@@ -500,7 +465,6 @@ if __name__ == "__main__":
             '--temporal_noise_type', 'filtered',
             '--temporal_noise_scale', '0.015',
             '--outlier_prob', '0.005',
-            # '--center_plot' 
         ])
         print(f"Running with example arguments: {sys.argv[1:]}")
 
