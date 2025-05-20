@@ -11,14 +11,9 @@ if module_path not in sys.path:
 else:
     print(f"'{module_path}' is already in sys.path")
 
-try:
-    from src.datasets.amass_dataset import AMASSSubsetDataset
-    from src.kinematics.skeleton_utils import get_skeleton_parents, get_num_joints
-    print("Custom modules imported successfully.")
-except ImportError as e:
-    print(f"ImportError: {e}")
-    print(f"Please ensure your Jupyter Notebook can find the 'src' directory from '{os.getcwd()}'")
-    raise
+from src.datasets.amass_dataset import AMASSSubsetDataset
+from src.kinematics.skeleton_utils import get_skeleton_parents, get_num_joints
+
 
 processed_npz_path = os.path.join("..","data", "processed", "CMU", "00", "00_01_poses.npz") 
 

@@ -4,11 +4,10 @@ import numpy as np
 import os
 import argparse
 
-# Adjust imports based on your project structure
 from src.models.pose_refiner_transformer import ManifoldRefinementTransformer
 from src.models.pose_refiner_simple import PoseRefinerSimple
 from src.kinematics.forward_kinematics import ForwardKinematics
-from src.kinematics.skeleton_utils import get_skeleton_parents, get_rest_directions_dict # For simple model FK
+from src.kinematics.skeleton_utils import get_skeleton_parents, get_rest_directions_dict
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Inference for Human Pose Smoothing Model")
@@ -32,17 +31,14 @@ def load_model_from_checkpoint(checkpoint_path, device):
     
     checkpoint = torch.load(checkpoint_path, map_location=device)
     
-    # --- Load model constructor arguments ---
-    # These should have been saved during training
     if 'model_constructor_args' not in checkpoint:
         raise KeyError("Checkpoint must contain 'model_constructor_args' for model instantiation.")
     model_args = checkpoint['model_constructor_args']
-    predict_covariance = model_args.get('predict_covariance_transformer', True) # 获取参数
+    predict_covariance = model_args.get('predict_covariance_transformer', True)
     
-    model_type = model_args.get('model_type', 'transformer') # Default to transformer if not specified
+    model_type = model_args.get('model_type', 'transformer')
 
     if model_type == 'transformer':
-        # Ensure all required args for ManifoldRefinementTransformer are present
         required_transformer_args = ['num_joints', 'joint_dim', 'window_size', 'd_model', 'nhead', 
                                      'num_encoder_layers', 'num_decoder_layers', 'dim_feedforward', 
                                      'dropout', 'smpl_parents', 'use_quaternions']
@@ -60,23 +56,10 @@ def load_model_from_checkpoint(checkpoint_path, device):
             num_decoder_layers=model_args['num_decoder_layers'],
             dim_feedforward=model_args['dim_feedforward'],
             dropout=model_args['dropout'],
-            smpl_parents=model_args['smpl_parents'], # Should be list
+            smpl_parents=model_args['smpl_parents'],
             use_quaternions=model_args['use_quaternions'],
             predict_covariance=predict_covariance
         )
-    # elif model_type == 'simple':
-    #     # fk_module_instance = ForwardKinematics(
-    #     #     parents_list=model_args['smpl_parents'], # Assuming these are saved
-    #     #     rest_directions_dict=get_rest_directions_dict(model_args.get('skeleton_type', 'smpl'))
-    #     # ).to(device)
-    #     # model = PoseModel(
-    #     #     J=model_args['num_joints'],
-    #     #     window_size=model_args['window_size'],
-    #     #     # Add other PoseModel specific args from model_args
-    #     #     fk_module=fk_module_instance
-    #     # )
-    #     print("Simple model loading not fully implemented yet.")
-    #     raise NotImplementedError("Simple model loading needs to be completed.")
     else:
         raise ValueError(f"Unsupported model type '{model_type}' in checkpoint.")
 
@@ -87,23 +70,10 @@ def load_model_from_checkpoint(checkpoint_path, device):
     print(f"Model '{model_type}' loaded from {checkpoint_path}.")
     print(f"Trained for {checkpoint.get('epoch', 'N/A')} epochs. Val MPJPE: {checkpoint.get('val_mpjpe', 'N/A'):.2f} mm")
     
-    return model, model_args # Return model_args as it contains window_size etc.
-
+    return model, model_args
 
 def refine_sequence_transformer(model, noisy_r3j_sequence_np, window_size, device, predict_covariance=False):
-    """
-    Refines a single pose sequence using the ManifoldRefinementTransformer model.
-    Args:
-        model: The trained PyTorch model.
-        noisy_r3j_sequence_np (np.ndarray): (num_frames, num_joints, 3)
-        window_size (int): The window size the model was trained with.
-        device: Torch device.
-    Returns:
-        refined_sequence_np (np.ndarray): (num_frames, num_joints, 3)
-    """
     num_frames, num_joints_data, _ = noisy_r3j_sequence_np.shape
-    
-    # num_joints_model comes from model.num_joints which is set during its __init__
     if num_joints_data != model.num_joints:
         raise ValueError(f"Input sequence has {num_joints_data} joints, model expects {model.num_joints}.")
 
@@ -123,17 +93,13 @@ def refine_sequence_transformer(model, noisy_r3j_sequence_np, window_size, devic
         
         noisy_r3j_sequence = torch.cat([padding_frames_start, noisy_r3j_sequence, padding_frames_end], dim=0)
         print(f"Padded input sequence from {original_num_frames} to {noisy_r3j_sequence.shape[0]} frames.")
-        num_frames = noisy_r3j_sequence.shape[0] # Update num_frames after padding
+        num_frames = noisy_r3j_sequence.shape[0]
 
     refined_frames_aggregated = torch.zeros_like(noisy_r3j_sequence)
     counts = torch.zeros(num_frames, device=device) 
     
     if predict_covariance:
-        # Cholesky L 是 (B, S, J, 3, 3)
-        # 我们需要聚合 (num_frames_padded, num_joints, 3, 3)
-        # 每个窗口的输出是 (window_size, num_joints, 3, 3)
         aggregated_cholesky_L = torch.zeros(num_frames, model.num_joints, 3, 3, device=device)
-        # counts_cov = torch.zeros(num_frames, model.num_joints, device=device) # 如果需要更细致的平均
 
     with torch.no_grad():
         for i in range(num_frames - window_size + 1):
@@ -148,18 +114,16 @@ def refine_sequence_transformer(model, noisy_r3j_sequence_np, window_size, devic
             if predict_covariance and cholesky_L_window is not None:
                 cholesky_L_squeezed = cholesky_L_window.squeeze(0) # (W, J, 3, 3)
                 aggregated_cholesky_L[i : i + window_size] += cholesky_L_squeezed
-                # counts_cov[i : i + window_size] += 1 # 如果用单独的counts
+                # counts_cov[i : i + window_size] += 1
     
-    counts = counts.unsqueeze(-1).unsqueeze(-1).clamp(min=1) # Add J and D dims for broadcasting
+    counts = counts.unsqueeze(-1).unsqueeze(-1).clamp(min=1)
     refined_sequence_padded = refined_frames_aggregated / counts
     
     final_cholesky_L = None
     if predict_covariance:
-        # counts_cov_reshaped = counts.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1).clamp(min=1) # (N_padded, 1, 1, 1) -> (N_padded, J, 3, 3)
         counts_for_L = counts.view(num_frames, 1, 1, 1).clamp(min=1) # (N_padded, 1, 1, 1)
         final_cholesky_L_padded = aggregated_cholesky_L / counts_for_L
     
-    # Remove padding if applied
     if original_num_frames < window_size:
         refined_sequence = refined_sequence_padded[padding_start_len : padding_start_len + original_num_frames]
         if predict_covariance and final_cholesky_L_padded is not None:
@@ -174,55 +138,13 @@ def refine_sequence_transformer(model, noisy_r3j_sequence_np, window_size, devic
     else:
         return refined_sequence.cpu().numpy(), None
 
-# def refine_sequence_simple(model, pose_sequence_flat_np, window_size, device):
-#     """
-#     Refines a sequence using the simple PoseModel (center frame refinement).
-#     Args:
-#         model: Trained PoseModel instance.
-#         pose_sequence_flat_np (np.ndarray): (num_frames, num_joints*3)
-#         window_size (int): Window size used during training.
-#         device: Torch device.
-#     Returns:
-#         refined_sequence_flat_np (np.ndarray): (num_frames, num_joints*3)
-#     """
-#     model.eval()
-#     half = window_size // 2
-#     T, J_flat_dim = pose_sequence_flat_np.shape
-#     num_joints = model.J # Get num_joints from the model instance
-    
-#     # Pad sequence (replication padding)
-#     pad_left = np.repeat(pose_sequence_flat_np[0:1], half, axis=0)
-#     pad_right = np.repeat(pose_sequence_flat_np[-1:], half, axis=0) # half or half-1 depending on even/odd window
-#     padded_seq_np = np.vstack([pad_left, pose_sequence_flat_np, pad_right])
-    
-#     refined_seq_list = []
-
-#     for t_center_original in range(T): # Iterate through original frames
-#         # The window is centered at t_center_original in the original sequence
-#         # which corresponds to t_center_original + half in the padded sequence
-#         window_start_idx = t_center_original # t_center_original + half - half
-#         window_np = padded_seq_np[window_start_idx : window_start_idx + window_size] 
-        
-#         inp_tensor = torch.from_numpy(window_np).float().unsqueeze(0).to(device) # (1, W, J*3)
-        
-#         with torch.no_grad():
-#             # PoseModel outputs: pred_positions (B, J, 3), pred_bones (B, J)
-#             pred_positions_tensor, _ = model(inp_tensor) # (1, J, 3)
-        
-#         # Reshape to (J*3) for the refined center frame
-#         refined_frame_flat = pred_positions_tensor.cpu().numpy().reshape(J_flat_dim) 
-#         refined_seq_list.append(refined_frame_flat)
-        
-#     return np.array(refined_seq_list)
-
-
 def main(args):
     device = torch.device(args.device)
     model, model_constructor_args = load_model_from_checkpoint(args.checkpoint_path, device)
     
     model_type = model_constructor_args.get('model_type', 'transformer')
     window_size = model_constructor_args['window_size']
-    predict_covariance = model_constructor_args.get('predict_covariance_transformer', False) # 获取参数
+    predict_covariance = model_constructor_args.get('predict_covariance_transformer', False)
     num_joints_model = model_constructor_args['num_joints']
     center_around_root_dataset = model_constructor_args.get('center_around_root', True if model_type=='transformer' else False)
 
@@ -237,13 +159,11 @@ def main(args):
     cholesky_L_output = None
 
     if model_type == 'transformer':
-        # Expected input: (num_frames, num_joints, 3)
         if noisy_input_np.ndim != 3 or noisy_input_np.shape[-1] != 3:
             raise ValueError(f"Transformer model expects input shape (frames, joints, 3), got {noisy_input_np.shape}")
         if noisy_input_np.shape[1] != num_joints_model:
              raise ValueError(f"Input sequence has {noisy_input_np.shape[1]} joints, but model was trained with {num_joints_model} joints.")
 
-        # If dataset was centered around root, apply the same transformation to input
         input_for_model = noisy_input_np.copy()
         root_positions_original_seq = None
         if center_around_root_dataset:
@@ -257,7 +177,6 @@ def main(args):
         
         if center_around_root_dataset and root_positions_original_seq is not None:
             print("Adding back original root joint positions.")
-            # Ensure refined_output_centered matches original length before adding root
             if refined_output_centered.shape[0] != root_positions_original_seq.shape[0]:
                  raise ValueError("Mismatch in frames between refined output and original root positions after padding/unpadding.")
             refined_output_sequence = refined_output_centered + root_positions_original_seq
@@ -265,15 +184,6 @@ def main(args):
         else:
             refined_output_sequence = refined_output_centered
             cholesky_L_output = cholesky_L_centered 
-
-
-    # elif model_type == 'simple':
-    #     # Expected input: (num_frames, num_joints*3)
-    #     if noisy_input_np.ndim != 2 or noisy_input_np.shape[1] != num_joints_model * 3:
-    #         raise ValueError(f"Simple model expects input shape (frames, joints*3), got {noisy_input_np.shape}")
-    #     refined_output_sequence = refine_sequence_simple(model, noisy_input_np, window_size, device)
-    #     # Output is (num_frames, num_joints*3), might need reshaping to (num_frames, num_joints, 3)
-    #     refined_output_sequence = refined_output_sequence.reshape(-1, num_joints_model, 3)
 
     else:
         raise ValueError(f"Unsupported model type '{model_type}' for inference.")

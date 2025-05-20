@@ -1,30 +1,5 @@
 #!/usr/bin/env python3
-"""
-visualize_amass_dual.py
---------------------------------
-A standalone script that reproduces the dual-view (clean vs. noisy) 3-D
-skeleton animation that was previously demonstrated in a Jupyter
-notebook.
-
-Usage examples
---------------
-# Show animation in an interactive window
-python visualize_amass_dual.py \
-    --amass_npz ../data/CMU/00/00_01_poses.npz \
-    --window_size 150 --noise_std 0.03
-
-# Save animation to MP4 (requires ffmpeg in $PATH)
-python visualize_amass_dual.py \
-    --amass_npz ../data/CMU/01/01_01_poses.npz \
-    --save ./cmp_clean_noisy.mp4
-
-The script assumes the project root (containing the *src* package) is
-one directory above the script’s location; adjust *PROJECT_ROOT* below
-if your layout differs.
-"""
-
 from __future__ import annotations
-
 import argparse
 import os
 import sys
@@ -35,29 +10,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from matplotlib.animation import FuncAnimation, FFMpegWriter, PillowWriter
-from mpl_toolkits.mplot3d import Axes3D  # noqa: F401  — needed for 3-D proj.
+from mpl_toolkits.mplot3d import Axes3D  
 
-# -----------------------------------------------------------------------------
-# Project-specific imports
-# -----------------------------------------------------------------------------
-PROJECT_ROOT = Path(__file__).resolve().parent.parent  # .. relative to script
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-try:
-    from src.datasets.amass_dataset import AMASSSubsetDataset
-    from src.kinematics.skeleton_utils import get_skeleton_parents
-except ImportError as exc:  # pragma: no cover
-    print("[ERROR] Could not import project modules. Make sure that the project\n"
-          "root (containing 'src') is on PYTHONPATH.\n"
-          f"Tried to add: {PROJECT_ROOT}\n"
-          f"Original error: {exc}",
-          file=sys.stderr)
-    sys.exit(1)
+from src.datasets.amass_dataset import AMASSSubsetDataset
+from src.kinematics.skeleton_utils import get_skeleton_parents
 
-# -----------------------------------------------------------------------------
-# Helper functions
-# -----------------------------------------------------------------------------
 
 def _create_animation(clean: np.ndarray,
                       noisy: np.ndarray,
@@ -158,9 +119,6 @@ def _create_animation(clean: np.ndarray,
     interval_ms = max(20, int(1000 / fps))
     return FuncAnimation(fig, _update, frames=T, interval=interval_ms, blit=False)
 
-# -----------------------------------------------------------------------------
-# Main
-# -----------------------------------------------------------------------------
 
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="AMASS clean vs. various noisy types visualization.")
@@ -193,90 +151,59 @@ def _parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def main() -> None:  # pragma: no cover
+def main() -> None:
     args = _parse_args()
     torch.manual_seed(args.seed); np.random.seed(args.seed)
     amass_path = Path(args.amass_npz).expanduser().resolve()
     if not amass_path.is_file(): sys.exit(f"[ERROR] AMASS file not found: {amass_path}")
 
     active_noise_descriptions = []
-    
-    # Construct data_paths for AMASSSubsetDataset
-    # Assumes metadata like gender might be in the same NPZ, or dataset handles its absence.
     data_paths_list = [{'poses_r3j_path': str(amass_path), 
                         'metadata_path': str(amass_path), 
                         'seq_name': amass_path.stem}]
 
-    # --- 1. Load CLEAN base sequence ---
     print("Loading base clean sequence...")
     clean_np_base = None
-    try:
-        dataset_clean_args = dict(
-            data_paths=data_paths_list,
-            window_size=args.window_size, skeleton_type=args.skeleton_type,
-            center_around_root=args.center_root_in_dataset, joint_selector_indices=None,
-            # Explicitly turn off all noises for the clean loader
-            gaussian_noise_std=0.0,
-            temporal_noise_type='none', temporal_noise_scale=0.0,
-            outlier_prob=0.0, outlier_scale=0.0,
-            bonelen_noise_scale=0.0
-        )
-        try: # Attempt with is_train=False
-            dataset_clean = AMASSSubsetDataset(**dataset_clean_args, is_train=False)
-        except TypeError as te: # Fallback if AMASSSubsetDataset doesn't take is_train
-            if "is_train" in str(te).lower():
-                print("[INFO] AMASSSubsetDataset (for clean) doesn't accept 'is_train'. Loading without it.")
-                dataset_clean = AMASSSubsetDataset(**dataset_clean_args)
-            else: raise
-        
-        if len(dataset_clean) == 0: sys.exit("[ERROR] Clean dataset loader is empty.")
-        # The first element from dataset[0] if noise_std=0 and is_train=False should be the clean window.
-        # Or, if dataset returns (noisy, clean, meta), the second one.
-        # Based on AMASSSubsetDataset structure, first element (noisy_win) is clean if no noise applied.
-        clean_window_from_loader, _, _ = dataset_clean[0] 
-        clean_np_base = clean_window_from_loader.numpy()
-        print(f"Base clean sequence loaded, shape: {clean_np_base.shape}")
-    except Exception as exc:
-        print(f"[ERROR] Failed to load base clean sequence: {exc}\n" + traceback.format_exc())
-        sys.exit(1)
+    dataset_clean_args = dict(
+        data_paths=data_paths_list,
+        window_size=args.window_size, skeleton_type=args.skeleton_type,
+        center_around_root=args.center_root_in_dataset, joint_selector_indices=None,
+        # Explicitly turn off all noises for the clean loader
+        gaussian_noise_std=0.0,
+        temporal_noise_type='none', temporal_noise_scale=0.0,
+        outlier_prob=0.0, outlier_scale=0.0,
+        bonelen_noise_scale=0.0
+    )
+    dataset_clean = AMASSSubsetDataset(**dataset_clean_args, is_train=False)
+    
+    if len(dataset_clean) == 0: sys.exit("[ERROR] Clean dataset loader is empty.")
+    clean_window_from_loader, _, _ = dataset_clean[0] 
+    clean_np_base = clean_window_from_loader.numpy()
+    print(f"Base clean sequence loaded, shape: {clean_np_base.shape}")
 
-    # --- 2. Load NOISY sequence using AMASSSubsetDataset with specified noises ---
     print("Loading noisy sequence with specified parameters...")
     noisy_np_to_animate = None
-    try:
-        dataset_noisy_args = dict(
-            data_paths=data_paths_list,
-            window_size=args.window_size, skeleton_type=args.skeleton_type,
-            center_around_root=args.center_root_in_dataset, joint_selector_indices=None,
-            # Pass all noise parameters from command line
-            gaussian_noise_std=args.gaussian_noise_std,
-            temporal_noise_type=args.temporal_noise_type,
-            temporal_noise_scale=args.temporal_noise_scale,
-            temporal_filter_window=args.temporal_filter_window,
-            temporal_event_prob=args.temporal_event_prob,
-            temporal_decay=args.temporal_decay,
-            outlier_prob=args.outlier_prob,
-            outlier_scale=args.outlier_scale,
-            bonelen_noise_scale=args.bonelen_noise_scale
-        )
-        try: # Attempt with is_train=True
-            dataset_noisy = AMASSSubsetDataset(**dataset_noisy_args, is_train=True)
-        except TypeError as te: # Fallback if AMASSSubsetDataset doesn't take is_train
-            if "is_train" in str(te).lower():
-                print("[INFO] AMASSSubsetDataset (for noisy) doesn't accept 'is_train'. Loading with noise params active.")
-                dataset_noisy = AMASSSubsetDataset(**dataset_noisy_args) # Noises active if std/scale/prob > 0
-            else: raise
-
-        if len(dataset_noisy) == 0: sys.exit("[ERROR] Noisy dataset loader is empty.")
-        # The first element is the window with all configured noises applied by the dataset.
-        noisy_window_from_loader, _, _ = dataset_noisy[0]
-        noisy_np_to_animate = noisy_window_from_loader.numpy()
-        print(f"Noisy sequence generated by dataset, shape: {noisy_np_to_animate.shape}")
-    except Exception as exc:
-        print(f"[ERROR] Failed to load noisy sequence from dataset: {exc}\n" + traceback.format_exc())
-        sys.exit(1)
-
-    # --- Construct noise description for title ---
+    dataset_noisy_args = dict(
+        data_paths=data_paths_list,
+        window_size=args.window_size, skeleton_type=args.skeleton_type,
+        center_around_root=args.center_root_in_dataset, joint_selector_indices=None,
+        gaussian_noise_std=args.gaussian_noise_std,
+        temporal_noise_type=args.temporal_noise_type,
+        temporal_noise_scale=args.temporal_noise_scale,
+        temporal_filter_window=args.temporal_filter_window,
+        temporal_event_prob=args.temporal_event_prob,
+        temporal_decay=args.temporal_decay,
+        outlier_prob=args.outlier_prob,
+        outlier_scale=args.outlier_scale,
+        bonelen_noise_scale=args.bonelen_noise_scale
+    )
+    dataset_noisy = AMASSSubsetDataset(**dataset_noisy_args, is_train=True)
+    if len(dataset_noisy) == 0: sys.exit("[ERROR] Noisy dataset loader is empty.")
+    noisy_window_from_loader, _, _ = dataset_noisy[0]
+    noisy_np_to_animate = noisy_window_from_loader.numpy()
+    print(f"Noisy sequence generated by dataset, shape: {noisy_np_to_animate.shape}")
+    
+    # noise description constructor
     if args.gaussian_noise_std > 0: active_noise_descriptions.append(f"Gauss σ={args.gaussian_noise_std:.2f}")
     if args.temporal_noise_type != 'none' and args.temporal_noise_scale > 0:
         if args.temporal_noise_type == 'filtered':
@@ -287,40 +214,37 @@ def main() -> None:  # pragma: no cover
     if args.bonelen_noise_scale > 0: active_noise_descriptions.append(f"BoneLen(s={args.bonelen_noise_scale:.2f})")
     if not active_noise_descriptions: active_noise_descriptions.append("None (should match clean)")
 
-
-    # --- Validate shapes for animation ---
+    # check animate shape
     if clean_np_base.shape != noisy_np_to_animate.shape or clean_np_base.ndim != 3:
         print(f"[ERROR] Final clean shape {clean_np_base.shape} and noisy shape {noisy_np_to_animate.shape} are incompatible.")
         sys.exit(1)
     
-    # --- MPJPE if any noise was actually applied ---
+    # MPJPE
     if not np.allclose(clean_np_base, noisy_np_to_animate):
         diff = clean_np_base - noisy_np_to_animate
         mpjpe_val = np.mean(np.sqrt(np.sum(diff**2, axis=2)))
         print(f"Average MPJPE (clean vs. final noisy) across sequence: {mpjpe_val:.4f} m")
 
-    # --- Create and show/save animation ---
+    # animation
     animation_title_noise_info = "; ".join(active_noise_descriptions) if active_noise_descriptions else "No specific noise requested"
-    try:
-        anim = _create_animation(clean_np_base, noisy_np_to_animate, args.skeleton_type, 
-                                 animation_title_noise_info, fps=args.fps)
-    except Exception:
-        print("[ERROR] Failed to create animation:\n" + traceback.format_exc()); sys.exit(1)
+    anim = _create_animation(clean_np_base, noisy_np_to_animate, args.skeleton_type, 
+                             animation_title_noise_info, fps=args.fps, 
+                             center_around_root_in_plot=args.center_root_in_plot)
 
     if args.save:
         output_path = Path(args.save).expanduser().resolve()
         file_ext = output_path.suffix.lower()
         print(f"Saving animation to {output_path} (this may take a while)…")
-        try:
-            if file_ext == ".gif": writer = PillowWriter(fps=args.fps, bitrate=1800) # Added bitrate for Pillow
-            elif file_ext == ".mp4": writer = FFMpegWriter(fps=args.fps, metadata={"artist": __file__})
-            else: print(f"[ERROR] Unsupported save format: {file_ext}. Use .gif or .mp4."); sys.exit(1)
-            anim.save(str(output_path), writer=writer)
-            print("Done.")
-        except Exception: print("[ERROR] Failed to save animation:\n" + traceback.format_exc()); sys.exit(1)
+        
+        if file_ext == ".gif": writer = PillowWriter(fps=args.fps, bitrate=1800) # Added bitrate for Pillow
+        elif file_ext == ".mp4": writer = FFMpegWriter(fps=args.fps, metadata={"artist": __file__})
+        else: 
+            print(f"[ERROR] Unsupported save format: {file_ext}. Use .gif or .mp4."); sys.exit(1)
+        anim.save(str(output_path), writer=writer)
+        print("Done.")
     else:
         plt.show()
 
 
-if __name__ == "__main__":  # pragma: no cover
+if __name__ == "__main__":
     main()

@@ -29,12 +29,8 @@ from src.losses.covariance_loss import NegativeLogLikelihoodLoss
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train Human Pose Smoothing Model with Transfer Learning for Covariance")
-
-    # --- Arguments from the original train.py (excluding predict_covariance_transformer) ---
     parser.add_argument('--model_type', type=str, default='transformer', choices=['transformer', 'simple'],
                         help="Type of model to train ('transformer' or 'simple') - Should be 'transformer' for this script")
-    # '--predict_covariance_transformer' is implicitly True in this script, so no need for CLI arg.
-
     parser.add_argument('--amass_root_dir', type=str, default=None,
                         help="Root directory containing AMASS .npz files. Will be split into train/val.")
     parser.add_argument('--val_split_ratio', type=float, default=0.1,
@@ -62,7 +58,7 @@ def parse_args():
     parser.add_argument('--outlier_scale', type=float, default=0.0)
     parser.add_argument('--bonelen_noise_scale', type=float, default=0.0)
 
-    # Transformer Model hyperparameters (will be used for the new model instance)
+    # Transformer Model hyperparameters
     parser.add_argument('--d_model_transformer', type=int, default=256)
     parser.add_argument('--nhead_transformer', type=int, default=8)
     parser.add_argument('--num_encoder_layers_transformer', type=int, default=4)
@@ -74,16 +70,14 @@ def parse_args():
 
     # Training hyperparameters
     parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--learning_rate', type=float, default=1e-4) # May need adjustment for fine-tuning
+    parser.add_argument('--learning_rate', type=float, default=1e-4)
     parser.add_argument('--num_epochs', type=int, default=50)
     parser.add_argument('--device', type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument('--num_workers', type=int, default=4)
-    
-    # --- Crucial for transfer learning: path to the PRE-TRAINED model ---
     parser.add_argument('--pretrained_checkpoint_path', type=str, required=True,
                         help="Path to the pre-trained model checkpoint (without covariance head) to load weights from.")
 
-    # Loss weights (covariance loss weight is now always active)
+    # Loss weights
     parser.add_argument('--w_tf_loss_pose', type=float, default=1.0)
     parser.add_argument('--w_tf_loss_vel', type=float, default=0.5)
     parser.add_argument('--w_tf_loss_accel', type=float, default=1.0)
@@ -121,11 +115,10 @@ def main(args):
     device = torch.device(args.device)
     num_joints = get_num_joints(args.skeleton_type)
     skeleton_parents_np = get_skeleton_parents(args.skeleton_type)
-    smplh_to_smpl_body_indices = None # Logic for this remains the same as in train.py
+    smplh_to_smpl_body_indices = None
 
-    # --- Dataset and Dataloader (same as train.py for AMASS) ---
+    # Dataset and Dataloader
     log_message(f"Loading AMASS dataset for Transformer model from root: {args.amass_root_dir}")
-    # ... (Copy AMASS dataset loading and splitting logic from your train.py) ...
     if not os.path.isdir(args.amass_root_dir):
         log_message(f"Error: AMASS root directory not found: {args.amass_root_dir}")
         return
@@ -137,12 +130,11 @@ def main(args):
     random.shuffle(all_npz_files)
     split_idx = int(len(all_npz_files) * (1 - args.val_split_ratio))
     train_files, val_files = all_npz_files[:split_idx], all_npz_files[split_idx:]
-    # ... (rest of dataset init from train.py, ensure AMASSSubsetDataset is used)
     train_dataset = AMASSSubsetDataset(
         data_paths=train_files, window_size=args.window_size,
         skeleton_type=args.skeleton_type, is_train=True,
         center_around_root=args.center_around_root_amass,
-        joint_selector_indices=smplh_to_smpl_body_indices, # Define this if needed
+        joint_selector_indices=smplh_to_smpl_body_indices,
         gaussian_noise_std=args.gaussian_noise_std_train,
         temporal_noise_type=args.temporal_noise_type,
         temporal_noise_scale=args.temporal_noise_scale,
@@ -159,11 +151,10 @@ def main(args):
             data_paths=val_files, window_size=args.window_size,
             skeleton_type=args.skeleton_type, is_train=False,
             center_around_root=args.center_around_root_amass,
-            joint_selector_indices=smplh_to_smpl_body_indices, # Define this
+            joint_selector_indices=smplh_to_smpl_body_indices,
             gaussian_noise_std=0.0, temporal_noise_type='none',
             temporal_noise_scale=0.0, outlier_prob=0.0, bonelen_noise_scale=0.0
         )
-    # ... (Dataloader creation) ...
     if train_dataset is None or len(train_dataset) == 0:
          log_message("Error: Training dataset is empty. Exiting.")
          return
@@ -176,8 +167,7 @@ def main(args):
         log_message(f"Training dataset size: {len(train_dataset)}, Validation dataset is empty or not created.")
 
 
-    # --- Model and Loss Criteria ---
-    # Model is ALWAYS instantiated WITH covariance prediction enabled for this script
+    # Model and Loss Criteria
     model_constructor_args_transfer = {
         'num_joints': num_joints, 'joint_dim': 3, 'window_size': args.window_size,
         'd_model': args.d_model_transformer, 'nhead': args.nhead_transformer,
@@ -185,11 +175,10 @@ def main(args):
         'num_decoder_layers': args.num_decoder_layers_transformer,
         'dim_feedforward': args.dim_feedforward_transformer, 'dropout': args.dropout_transformer,
         'smpl_parents': skeleton_parents_np.tolist(),
-        'use_quaternions': args.use_quaternions_transformer, # Ensure this comes from args
+        'use_quaternions': args.use_quaternions_transformer,
         'skeleton_type': args.skeleton_type,
-        'predict_covariance': True, # <- Crucial: Always True for this transfer script
-        # Include other args from your original train.py's model_constructor_args if ManifoldRefinementTransformer needs them
-        'center_around_root_amass': args.center_around_root_amass # Store for potential reference if needed
+        'predict_covariance': True,
+        'center_around_root_amass': args.center_around_root_amass
     }
 
     model = ManifoldRefinementTransformer(**model_constructor_args_transfer).to(device)
@@ -198,12 +187,12 @@ def main(args):
     criterion_vel = VelocityLoss(loss_type='l1').to(device)
     criterion_accel = AccelerationLoss(loss_type='l1').to(device)
     criterion_bone = BoneLengthMSELoss(parents_list=skeleton_parents_np.tolist()).to(device)
-    criterion_cov = NegativeLogLikelihoodLoss().to(device) # Covariance loss is always used
+    criterion_cov = NegativeLogLikelihoodLoss().to(device)
 
     log_message(f"Instantiated Transformer model FOR TRANSFER LEARNING (covariance head enabled).")
     log_message(f"Number of parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
 
-    # --- Load Pre-trained Weights (MODIFIED LOGIC) ---
+    # Load Pre-trained Weights
     start_epoch = 1
     best_val_loss = float('inf')
 
@@ -216,14 +205,11 @@ def main(args):
     
     pretrained_state_dict = pretrained_checkpoint['model_state_dict']
     current_model_dict = model.state_dict()
-
-    # Filter out parameters that are not in the current model OR have size mismatch
-    # (Mainly for `output_head_covariance` which won't be in pretrained_state_dict)
     weights_to_load = {k: v for k, v in pretrained_state_dict.items() 
                        if k in current_model_dict and v.size() == current_model_dict[k].size()}
     
-    current_model_dict.update(weights_to_load) # Update current model's dict with loaded weights
-    model.load_state_dict(current_model_dict)   # Load the merged dict
+    current_model_dict.update(weights_to_load)
+    model.load_state_dict(current_model_dict)
 
     num_loaded_params = sum(p.numel() for p in weights_to_load.values())
     log_message(f"Loaded {len(weights_to_load)} matching Tensors (total {num_loaded_params} parameters) from pre-trained checkpoint.")
@@ -231,16 +217,12 @@ def main(args):
     missing_keys = [k for k in current_model_dict.keys() if k not in weights_to_load]
     if missing_keys:
         log_message(f"Weights for these layers were NOT in the pre-trained checkpoint and are RANDOMLY INITIALIZED: {missing_keys}")
-    
-    # Optimizer: It's generally safer to re-initialize the optimizer when layers change
-    # or when transfer learning, especially if learning rates for new layers should differ.
-    # For simplicity, we re-initialize here.
-    # You could try to load and adapt if needed, but it's more complex.
+
     optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=5, verbose=True)
     log_message("Optimizer and Scheduler re-initialized for transfer learning.")
 
-    # --- Training Loop (mostly same as train.py for transformer) ---
+    # Training Loop
     for epoch in range(start_epoch, args.num_epochs + 1):
         model.train()
         total_train_loss_epoch = 0
@@ -291,19 +273,18 @@ def main(args):
                     f"(P: {avg_train_p:.4f} V: {avg_train_v:.4f} A: {avg_train_a:.4f} "
                     f"B: {avg_train_b:.4f} C: {avg_train_c:.4f})")
 
-        # --- Validation Loop (mostly same as train.py for transformer) ---
+        # Validation Loop
         if val_loader is None:
-            # ... (save checkpoint based on train loss if no val_loader) ...
-            if avg_train_loss_epoch < best_val_loss: # Using train loss if no val
+            if avg_train_loss_epoch < best_val_loss:
                 best_val_loss = avg_train_loss_epoch
                 checkpoint_name = f"model_epoch_{epoch:03d}_trainloss_{avg_train_loss_epoch:.4f}.pth"
                 checkpoint_path = os.path.join(run_checkpoint_dir, checkpoint_name)
                 torch.save({
                     'epoch': epoch, 'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
-                    'train_loss': avg_train_loss_epoch, # Save train loss here
+                    'train_loss': avg_train_loss_epoch,
                     'args': vars(args),
-                    'model_constructor_args': model_constructor_args_transfer # Use the transfer constructor args
+                    'model_constructor_args': model_constructor_args_transfer
                 }, checkpoint_path)
                 log_message(f"Best model checkpoint (based on train loss) saved to {checkpoint_path}")
             continue
@@ -367,8 +348,8 @@ def main(args):
                 'epoch': epoch, 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'val_loss': avg_val_loss, 'val_mpjpe': avg_val_mpjpe,
-                'args': vars(args), # Current args for this transfer run
-                'model_constructor_args': model_constructor_args_transfer, # Args used to create this model
+                'args': vars(args),
+                'model_constructor_args': model_constructor_args_transfer,
                 'val_loss_components': {'P': avg_val_p, 'V': avg_val_v, 'A': avg_val_a, 'B': avg_val_b, 'C': avg_val_c}
             }
             checkpoint_name = f"model_epoch_{epoch:03d}_valloss_{avg_val_loss:.4f}_mpjpe_{avg_val_mpjpe:.2f}_C_{avg_val_c:.4f}.pth"
