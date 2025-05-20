@@ -6,14 +6,19 @@
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 
 ```mermaid
+---
+config:
+    look: handDrawn
+    maxTextSize: 80000
+---
 graph TD
     %% ----------  class definitions ----------
-    classDef input         fill:#a2d2ff,stroke:#333,stroke-width:1px
-    classDef encoderdecoder fill:#bde0fe,stroke:#333,stroke-width:1px
-    classDef outputhead    fill:#ffc8dd,stroke:#333,stroke-width:1px
-    classDef fk            fill:#ffafcc,stroke:#333,stroke-width:1px
-    classDef loss          fill:#caffbf,stroke:#333,stroke-width:1px
-    classDef gt            fill:#fdffb6,stroke:#333,stroke-width:1px
+    classDef input          fill:#a2d2ff,stroke:#333,stroke-width:1px,color:#000
+    classDef encoderdecoder fill:#bde0fe,stroke:#333,stroke-width:1px,color:#000
+    classDef outputhead     fill:#ffc8dd,stroke:#333,stroke-width:1px,color:#000
+    classDef fk             fill:#ffafcc,stroke:#333,stroke-width:1px,color:#000
+    classDef loss           fill:#caffbf,stroke:#333,stroke-width:1px,color:#000
+    classDef gt             fill:#fdffb6,stroke:#333,stroke-width:1px,color:#000
 
     %% ----------  node declarations ----------
     Input["Input: Noisy Pose Window (AMASS)<br>L × J × 3"]:::input
