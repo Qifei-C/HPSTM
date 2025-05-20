@@ -8,7 +8,7 @@
 ```mermaid
 ---
 config:
-    look: handDrawn
+    look: light
     maxTextSize: 80000
 ---
 graph TD
