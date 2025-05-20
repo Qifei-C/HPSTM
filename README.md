@@ -5,7 +5,81 @@
 ![License](https://img.shields.io/github/license/Qifei-C/HPSTM)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 
-![Model Arch](https://github.com/user-attachments/assets/45697ad7-d5e4-494c-9123-3745fe2fcb08)
+```mermaid
+graph TD
+    %% ----------  class definitions ----------
+    classDef input         fill:#a2d2ff,stroke:#333,stroke-width:1px
+    classDef encoderdecoder fill:#bde0fe,stroke:#333,stroke-width:1px
+    classDef outputhead    fill:#ffc8dd,stroke:#333,stroke-width:1px
+    classDef fk            fill:#ffafcc,stroke:#333,stroke-width:1px
+    classDef loss          fill:#caffbf,stroke:#333,stroke-width:1px
+    classDef gt            fill:#fdffb6,stroke:#333,stroke-width:1px
+
+    %% ----------  node declarations ----------
+    Input["Input: Noisy Pose Window (AMASS)<br>L × J × 3"]:::input
+    EncDec{"Temporal Encoder–Decoder<br>(Transformer + PosEnc)"}:::encoderdecoder
+
+    HeadPose["Pose & Length Output Head"]:::outputhead
+    Rotations["Rotations q<br>(Root Orient + Joint Rots)"]:::outputhead
+    BoneLengths["Learned Bone Lengths l"]:::outputhead
+    RootTranslation["Root Translation t"]:::outputhead
+
+    HeadCov["Covariance Output Head"]:::outputhead
+    CovarianceParams["Covariance Params<br>(Cholesky L)"]:::outputhead
+
+    SkeletonDef["Canonical Skeleton Definition<br>(Parents, Rest Directions)"]:::input
+    FK["Differentiable FK"]:::fk
+    RefinedPoseSeq["Refined Pose Sequence P<sub>refined</sub><br>L × J × 3"]:::fk
+
+    GT_Poses["GT Pose Sequence P<sub>gt</sub><br>L × J × 3"]:::gt
+    GT_CanonBones["GT Canonical Bone Lengths l<sub>gt</sub>"]:::gt
+
+    LossCalc{"Loss Computation"}:::loss
+    Backprop["Backpropagate"]:::loss
+
+    %% ----------  main flow ----------
+    Input --> EncDec
+
+    EncDec --> HeadPose
+    HeadPose --> Rotations
+    HeadPose --> BoneLengths
+    HeadPose --> RootTranslation
+
+    EncDec --> HeadCov
+    HeadCov --> CovarianceParams
+
+    %% ----------  FK sub-graph ----------
+    subgraph "Forward Kinematics"
+        direction LR
+        SkeletonDef -.-> FK
+        RootTranslation --> FK
+        Rotations --> FK
+        BoneLengths --> FK
+    end
+    FK --> RefinedPoseSeq
+
+    %% ----------  Loss sub-graph ----------
+    subgraph "Training Loss"
+        direction TB
+        GT_Poses --> LossCalc
+        RefinedPoseSeq --> LossCalc
+        
+        GT_CanonBones --> LossCalc
+        BoneLengths --> LossCalc
+        
+        CovarianceParams --> LossCalc
+
+        LossCalc -- "Total Loss" --> Backprop
+        LossCalc -.->|"Position Loss (L1/MSE)"| GT_Poses
+        LossCalc -.->|"Velocity Loss"| GT_Poses
+        LossCalc -.->|"Acceleration Loss"| GT_Poses
+        LossCalc -.->|"Bone Length Loss (MSE)"| GT_CanonBones
+        LossCalc -.->|"NLL Covariance Loss"| GT_Poses
+    end
+
+    Backprop --> EncDec
+
+```
 
 
 ## Overview
