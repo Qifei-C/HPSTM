@@ -128,6 +128,20 @@ For a complete understanding of the entire robotic imitation system, please refe
 * **Training Strategy:** Trained on noisy pose sequences with ground-truth targets, using losses such as per-joint position error and bone-length consistency error.
 * **Inference Pipeline:** Applies the trained model in a sliding-window fashion to new noisy sequences to produce smoothed outputs.
 
+## Recent Update
+
+HPSTM still requires additional ablation studies to verify that the introduction of the FK structure indeed preserves the advantages of the manifold, rather than those of the Transformer model itself.
+
+## Reflections after reading VLA and Pi0-related literature:
+
+HPSTM is currently a discriminative temporal regression network, but its “noise-denoising” training paradigm shares clear structural similarities with diffusion and generative models. This training approach lays the groundwork for further extending HPSTM into a probabilistic generative model, such as a score-based diffusion model or a flow-based model. In theory, HPSTM has the potential to become a generative model; by simply expanding the sampling strategy and objective function, it could generate new trajectories from pure noise.
+
+Next Steps:
+* Based on the current discriminative training paradigm of HPSTM, introduce flow-matching or diffusion-style noise-denoising loss. During inference, perform multi-step denoising sampling of trajectories, enabling HPSTM to become a generative action/trajectory model capable of generating physically plausible new sequences from pure noise.
+* Following the workflow of score-based/diffusion models, extend HPSTM’s “denoising” capability to iterative sampling from pure noise to realistic trajectories: use DDPM/score-matching losses during training, and adopt a “denoising-sampling” chained generation process during inference.
+* Enable HPSTM to learn invertible mappings of the action distribution, so that trajectories can be generated from Gaussian noise via a single-step invertible network. This involves introducing normalizing flow losses or architectures.
+
+
 ## Datasets
 
 * **AMASS (Archive of Motion Capture as Surface Shapes):** Recommended for its diversity and high-quality 3D poses.
@@ -234,5 +248,7 @@ Key components include:
 * [3] Various authors on Differentiable Forward Kinematics for human skeletons.
 * [4] AMASS Dataset: [https://amass.is.tue.mpg.de/](https://amass.is.tue.mpg.de/)
 * [5] Human3.6M Dataset: [http://vision.imar.ro/human3.6m/](http://vision.imar.ro/human3.6m/)
+
+
 
 
